@@ -13,7 +13,7 @@ from src.utils import setup_logger, FORCE, TIME, TRACE
 
 
 # ログ設定（DEBUG, INFO, WARNING, ERROR から選択）
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 LOG_TO_FILE = True  # ファイルにログを出力する場合はTrue
 
 # 特定レベルのみ出力する場合は allowed_levels を使用
