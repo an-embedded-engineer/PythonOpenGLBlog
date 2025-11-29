@@ -5,6 +5,25 @@
 OpenGL 3DプログラミングをPythonで学ぶブログシリーズのサンプルコード。
 各フェーズで段階的に`src/main.py`を拡張していく構成。
 
+## クイックスタート
+
+```bash
+source .venv/bin/activate && python -m src.main
+```
+
+## アーキテクチャ
+
+```
+src/main.py          → App (core/app.py) → Window, GUI, Shader
+     ↓                      ↓
+setup_logger()        メインループ: _update() → _render()
+```
+
+- **App** (`core/app.py`): メインループ、シェーダー/ジオメトリ管理、imgui描画
+- **Window** (`core/window.py`): GLFW初期化、OpenGL 3.3 Core Profile設定
+- **GUI** (`core/gui.py`): imgui-bundle + GlfwRenderer
+- **Shader** (`graphics/shader.py`): GLSLコンパイル/リンク、uniform管理
+
 ## 開発フロー
 
 ### フェーズ開発の手順（必須チェックリスト）
@@ -34,6 +53,8 @@ OpenGL 3DプログラミングをPythonで学ぶブログシリーズのサン�
 ### コード編集の原則
 - `src/main.py`は**段階的に拡張**する（前フェーズのコードを維持しつつ機能追加）
 - 各フェーズで動作するサンプルコードを維持する
+- **教育的価値重視**: 複雑な抽象化より明示的で理解しやすいコードを優先
+- **imguiでインタラクティブ**: パラメータ調整可能なデモを目指す
 
 ## 技術スタック
 
@@ -56,6 +77,21 @@ OpenGL 3DプログラミングをPythonで学ぶブログシリーズのサン�
 - PyOpenGLは `import OpenGL.GL as gl` 形式でインポートし、`gl.` プレフィックスで使用
 - シェーダーはGLSLで記述（バージョン: `#version 330 core`）
 - シェーダーファイルは `src/shaders/` に配置（`.vert`, `.frag` 拡張子）
+- 頂点属性: `layout (location = 0) in vec3 aPos;`
+
+### ロガー
+```python
+from src.utils import setup_logger, logger, FORCE, TIME, TRACE
+setup_logger(level=logging.DEBUG, log_to_file=True, log_dir="logs")
+logger.debug("message")  # カスタムレベル: logger.force(), logger.time(), logger.trace()
+```
+
+### imgui初期化順序（重要）
+```python
+self._window = Window(800, 600, "Title")
+self._gui = GUI(self._window)
+self._window.setup_key_callback()  # GUI後にコールバック設定（GlfwRendererが上書きするため）
+```
 
 ### テスト
 - Phase 4以降、クラスや機能単位でpytestによるユニットテストを作成
