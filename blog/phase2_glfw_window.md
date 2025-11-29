@@ -310,4 +310,4 @@ glClearColor(0.392, 0.584, 0.929, 1.0)
 
 **前回**: [第1回「開発環境を整えよう」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/234119)
 
-**次回**: 第3回「imguiを組み込む」（準備中）
+**次回**: [第3回「imguiを組み込む」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/003141)
