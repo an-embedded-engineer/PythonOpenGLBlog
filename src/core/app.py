@@ -11,6 +11,7 @@ import OpenGL.GL as gl
 from src.core.window import Window
 from src.core.gui import GUI
 from src.graphics import Shader
+from src.graphics.transform import Transform
 from src.utils.logger import logger
 
 
@@ -31,6 +32,14 @@ class App:
 
         # 背景色（RGBA、0.0〜1.0）
         self._clear_color = [0.2, 0.2, 0.2, 1.0]
+
+        # 座標変換
+        self._transform = Transform()
+
+        # Model行列の回転パラメータ（imguiで調整可能）
+        self._rotation_x = 0.0
+        self._rotation_y = 0.0
+        self._rotation_z = 0.0
 
         # シェーダーとジオメトリの初期化
         self._shader: Shader | None = None
@@ -105,6 +114,8 @@ class App:
 
         # ===== imguiウィンドウ =====
         self._draw_settings_window()
+        self._draw_camera_window()
+        self._draw_transform_window()
 
     def _draw_settings_window(self) -> None:
         """設定ウィンドウを描画"""
@@ -119,6 +130,52 @@ class App:
         # ボタンの例
         if imgui.button("Reset Color"):
             self._clear_color = [0.2, 0.2, 0.2, 1.0]
+
+        imgui.end()
+
+    def _draw_camera_window(self) -> None:
+        """カメラウィンドウを描画"""
+        imgui.begin("Camera")
+
+        # カメラ位置
+        cam_pos = self._transform.camera_pos
+        changed_pos_x, cam_x = imgui.slider_float("Camera X##pos", cam_pos[0], -10.0, 10.0)
+        changed_pos_y, cam_y = imgui.slider_float("Camera Y##pos", cam_pos[1], -10.0, 10.0)
+        changed_pos_z, cam_z = imgui.slider_float("Camera Z##pos", cam_pos[2], -10.0, 10.0)
+
+        if changed_pos_x or changed_pos_y or changed_pos_z:
+            self._transform.set_camera_position(cam_x, cam_y, cam_z)
+
+        # カメラ視点
+        cam_target = self._transform.camera_target
+        changed_tgt_x, tgt_x = imgui.slider_float("Target X##pos", cam_target[0], -5.0, 5.0)
+        changed_tgt_y, tgt_y = imgui.slider_float("Target Y##pos", cam_target[1], -5.0, 5.0)
+        changed_tgt_z, tgt_z = imgui.slider_float("Target Z##pos", cam_target[2], -5.0, 5.0)
+
+        if changed_tgt_x or changed_tgt_y or changed_tgt_z:
+            self._transform.set_camera_target(tgt_x, tgt_y, tgt_z)
+
+        # 視野角
+        changed_fov, fov = imgui.slider_float("FOV", self._transform.fov, 15.0, 120.0)
+        if changed_fov:
+            self._transform.set_fov(fov)
+
+        imgui.end()
+
+    def _draw_transform_window(self) -> None:
+        """座標変換ウィンドウを描画"""
+        imgui.begin("Transform")
+
+        # Model行列の回転
+        changed_x, self._rotation_x = imgui.slider_float("Rotate X", self._rotation_x, 0.0, 360.0)
+        changed_y, self._rotation_y = imgui.slider_float("Rotate Y", self._rotation_y, 0.0, 360.0)
+        changed_z, self._rotation_z = imgui.slider_float("Rotate Z", self._rotation_z, 0.0, 360.0)
+
+        # リセットボタン
+        if imgui.button("Reset Rotation"):
+            self._rotation_x = 0.0
+            self._rotation_y = 0.0
+            self._rotation_z = 0.0
 
         imgui.end()
 
@@ -141,8 +198,24 @@ class App:
 
     def _draw_triangle(self) -> None:
         """三角形を描画する"""
-        if self._shader:
-            self._shader.use()
+        if not self._shader:
+            return
+
+        # Model行列を更新
+        self._transform.set_model_identity()
+        self._transform.rotate_model_x(self._rotation_x)
+        self._transform.rotate_model_y(self._rotation_y)
+        self._transform.rotate_model_z(self._rotation_z)
+
+        # シェーダーを使用
+        self._shader.use()
+
+        # 行列をシェーダーに設定
+        self._shader.set_mat4("model", self._transform.model)
+        self._shader.set_mat4("view", self._transform.view)
+        self._shader.set_mat4("projection", self._transform.projection)
+
+        # 三角形の描画
         gl.glBindVertexArray(self._vao)
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3)
         gl.glBindVertexArray(0)
@@ -159,4 +232,5 @@ class App:
 
         self._gui.shutdown()
         self._window.terminate()
+
 

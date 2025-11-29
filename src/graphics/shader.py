@@ -205,7 +205,8 @@ class Shader:
         """4x4行列のUniform変数を設定（numpy配列を想定）"""
         location = self._get_uniform_location(name)
         if location != -1:
-            gl.glUniformMatrix4fv(location, 1, gl.GL_FALSE, matrix)
+            # GL_TRUE: numpyの行優先配列をOpenGLの列優先形式に転置
+            gl.glUniformMatrix4fv(location, 1, gl.GL_TRUE, matrix)
 
     def __del__(self) -> None:
         """デストラクタ"""
