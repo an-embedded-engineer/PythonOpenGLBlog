@@ -1,7 +1,11 @@
 
 """
-PythonOpenGL - Phase 2: GLFWウィンドウ作成
+PythonOpenGL - Phase 3: imgui基礎
 """
+# imgui_bundleをglfwより先にインポート（GLFWライブラリの重複警告を回避）
+from imgui_bundle import imgui
+from imgui_bundle.python_backends.glfw_backend import GlfwRenderer
+
 import glfw
 from OpenGL.GL import (
     glClear,
@@ -9,17 +13,6 @@ from OpenGL.GL import (
     glViewport,
     GL_COLOR_BUFFER_BIT,
 )
-
-
-def key_callback(window, key: int, scancode: int, action: int, mods: int) -> None:
-    """キーボード入力のコールバック関数"""
-    if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
-        glfw.set_window_should_close(window, True)
-
-
-def framebuffer_size_callback(window, width: int, height: int) -> None:
-    """フレームバッファサイズ変更時のコールバック関数"""
-    glViewport(0, 0, width, height)
 
 
 def main() -> None:
@@ -36,30 +29,60 @@ def main() -> None:
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)  # macOSで必要
 
         # ウィンドウの作成
-        window = glfw.create_window(800, 600, "PythonOpenGL", None, None)
+        window = glfw.create_window(800, 600, "PythonOpenGL - imgui", None, None)
         if not window:
             raise RuntimeError("ウィンドウの作成に失敗しました")
 
         # OpenGLコンテキストを現在のスレッドに設定
         glfw.make_context_current(window)
 
-        # コールバック関数の設定
-        glfw.set_key_callback(window, key_callback)
-        glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
+        # imguiの初期化
+        imgui.create_context()
+        impl = GlfwRenderer(window)
 
-        # 背景色の設定（ダークグレー）
-        glClearColor(0.2, 0.2, 0.2, 1.0)
+        # 背景色（RGBA、0.0〜1.0）
+        clear_color = [0.2, 0.2, 0.2, 1.0]
 
         # メインループ
         while not glfw.window_should_close(window):
+            # イベントの処理
+            glfw.poll_events()
+            impl.process_inputs()
+
+            # imguiフレーム開始
+            imgui.new_frame()
+
+            # ===== imguiウィンドウ =====
+            imgui.begin("Settings")
+
+            # 背景色の変更
+            changed, clear_color = imgui.color_edit4("Background", clear_color)
+
+            # FPSの表示
+            imgui.text(f"FPS: {imgui.get_io().framerate:.1f}")
+
+            # ボタンの例
+            if imgui.button("Reset Color"):
+                clear_color = [0.2, 0.2, 0.2, 1.0]
+
+            imgui.end()
+            # ===========================
+
+            # 背景色の適用
+            glClearColor(*clear_color)
+
             # 画面のクリア
             glClear(GL_COLOR_BUFFER_BIT)
+
+            # imguiのレンダリング
+            imgui.render()
+            impl.render(imgui.get_draw_data())
 
             # バッファの入れ替え
             glfw.swap_buffers(window)
 
-            # イベントの処理
-            glfw.poll_events()
+        # imguiの終了処理
+        impl.shutdown()
 
     finally:
         # GLFWの終了処理
