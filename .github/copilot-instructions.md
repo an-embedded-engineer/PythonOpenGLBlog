@@ -50,6 +50,31 @@ setup_logger()        メインループ: _update() → _render()
 - 例: `phase4/shader-triangle`, `phase6b/complex-shapes`
 - 記事公開時にタグ付け（`v4.0`等）→ mainにマージ
 
+### Git操作手順（ユーザー主導）
+- **コミット**: 機能実装完了後、ステージ・コミット・プッシュを実施
+  ```bash
+  git add -A
+  git commit -m "feat: Phase {番号}{サブ番号} - {機能説明}"
+  git push -u origin phase{番号}{サブ番号}/{キーワード}
+  ```
+- **タグ付け・マージ**: 記事公開後、以下の順序で実施
+  ```bash
+  git tag v{番号}{サブ番号}.0  # タグ作成（例: v5a.0）
+  git checkout main
+  git merge phase{番号}{サブ番号}/{キーワード}
+  git push origin main
+  git push origin v{番号}{サブ番号}.0
+  ```
+
+### コミットメッセージルール
+- **機能実装**: `feat: Phase {番号} - {説明}`
+- **ドキュメント更新**: `docs: Phase {番号} - {説明}`
+- **バグ修正**: `fix: {説明}`
+- **リファクタリング**: `refactor: {説明}`
+- 例:
+  - `feat: Phase 5a - 座標変換システムの実装`
+  - `docs: Phase 5a - リンク更新（公開済み記事一覧）`
+
 ### コード編集の原則
 - `src/main.py`は**段階的に拡張**する（前フェーズのコードを維持しつつ機能追加）
 - 各フェーズで動作するサンプルコードを維持する
