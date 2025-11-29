@@ -83,6 +83,7 @@ AIと人間が協力してコードと記事を作り上げていく様子も、
 | 第1回 | [開発環境を整えよう](https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/234119) | 2025/11/29 |
 | 第2回 | [GLFWでウィンドウを作る](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/000424) | 2025/11/30 |
 | 第3回 | [imguiを組み込む](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/003141) | 2025/11/30 |
+| 第4回 | [シェーダー入門 - 虹色の三角形を描く](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/031136) | 2025/11/30 |
 
 ### サンプルコードの入手方法
 

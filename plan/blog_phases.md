@@ -235,3 +235,4 @@ PythonOpenGL/
 | 1 | 開発環境を整えよう | 2025/11/29 | v1.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/234119 |
 | 2 | GLFWでウィンドウを作る | 2025/11/30 | v2.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/000424 |
 | 3 | imguiを組み込む | 2025/11/30 | v3.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/003141 |
+| 4 | シェーダー入門 - 虹色の三角形を描く | 2025/11/30 | v4.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/031136 |

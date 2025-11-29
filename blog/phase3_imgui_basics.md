@@ -270,4 +270,4 @@ imguiを使うことで、パラメータの調整やデバッグ情報の表示
 
 **前回**: [第2回「GLFWでウィンドウを作る」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/000424)
 
-**次回**: 第4回「シェーダー入門（頂点編）」（準備中）
+**次回**: [第4回「シェーダー入門 - 虹色の三角形を描く」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/031136)
