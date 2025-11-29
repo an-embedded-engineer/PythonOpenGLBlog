@@ -314,7 +314,7 @@ source .venv/bin/activate && python -m src.main
 
 三角形が表示され、imguiのスライダーで回転やカメラ位置を調整できます！
 
-![カメラと座標変換](images/phase5_1.png)
+![座標変換の基礎](images/phase5_1.png)
 
 - **Camera X/Y/Z**: カメラ位置を移動
 - **Target X/Y/Z**: カメラの注視点を変更
