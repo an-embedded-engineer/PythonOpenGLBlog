@@ -160,6 +160,12 @@ if __name__ == '__main__':
 作成したコードを実行して、環境が正しくセットアップされているか確認します。
 
 ```bash
+# 仮想環境が有効になっていることを確認（プロンプトに(.venv)が表示されているか）
+# 有効になっていない場合は以下を実行
+source .venv/bin/activate  # macOS/Linux
+# .venv\Scripts\activate   # Windows
+
+# 確認コードを実行
 python src/main.py
 ```
 
