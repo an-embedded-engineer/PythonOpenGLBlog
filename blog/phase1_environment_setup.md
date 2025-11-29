@@ -208,4 +208,4 @@ VS Codeを使用している場合、以下の拡張機能をインストール�
 
 **前回**: [第0回「このシリーズについて」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/232629)
 
-**次回**: 第2回「GLFWでウィンドウを作る」（準備中）
+**次回**: [第2回「GLFWでウィンドウを作る」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/000424)
