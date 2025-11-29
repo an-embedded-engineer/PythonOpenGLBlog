@@ -1,6 +1,6 @@
-# 第0回「このシリーズについて」
+# GitHub Copilotと作る Pythonで OpenGL 3Dプログラミング
 
-## GitHub Copilotと作る Pythonで OpenGL 3Dプログラミング
+## 第0回「このシリーズについて」
 
 ### はじめに
 
