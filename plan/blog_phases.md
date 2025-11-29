@@ -214,3 +214,21 @@ PythonOpenGL/
 - **imgui-bundle**: デバッグUI・パラメータ調整
 - **scipy**: 科学計算（必要に応じて）
 - **mapbox_earcut**: ポリゴン三角形分割（必要に応じて）
+
+## ブログ公開情報
+
+### 公開先
+- **はてなブログ**: https://an-embedded-engineer.hateblo.jp/
+- 記法: Markdown
+
+### はてなブログ固有の記法に関する注意
+- 画像: フォトライフにアップロード後、`[f:id:ユーザー名:画像ID:plain]` 形式で埋め込み
+- 記事リンク: URLを貼り付けるとカード形式で表示、または `[記事タイトル:embed:cite]`
+- 目次: `[:contents]` で自動生成
+- 脚注: `((脚注テキスト))` 形式
+
+### 公開済み記事
+
+| Phase | タイトル | URL |
+|-------|----------|-----|
+| 0 | このシリーズについて | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/232629 |
