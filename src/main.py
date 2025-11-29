@@ -1,92 +1,37 @@
 
 """
-PythonOpenGL - Phase 3: imgui基礎
+PythonOpenGL - Phase 4a: シェーダー基礎（頂点編）
 """
-# imgui_bundleをglfwより先にインポート（GLFWライブラリの重複警告を回避）
-from imgui_bundle import imgui
-from imgui_bundle.python_backends.glfw_backend import GlfwRenderer
+import logging
 
+# imguiとGLFWのimport順による警告を防ぐため、ここでimportする
+from imgui_bundle import imgui
 import glfw
-from OpenGL.GL import (
-    glClear,
-    glClearColor,
-    glViewport,
-    GL_COLOR_BUFFER_BIT,
-)
+
+from src.core import App
+from src.utils import setup_logger, FORCE, TIME, TRACE
+
+
+# ログ設定（DEBUG, INFO, WARNING, ERROR から選択）
+LOG_LEVEL = logging.INFO
+LOG_TO_FILE = True  # ファイルにログを出力する場合はTrue
+
+# 特定レベルのみ出力する場合は allowed_levels を使用
+# 例: FORCE, INFO, TIME のみ出力
+# ALLOWED_LEVELS = [FORCE, logging.INFO, TIME]
 
 
 def main() -> None:
     """メイン関数"""
-    # GLFWの初期化
-    if not glfw.init():
-        raise RuntimeError("GLFWの初期化に失敗しました")
+    # ロガーの設定
+    # 通常モード: 指定レベル以上を出力
+    setup_logger(level=LOG_LEVEL, log_to_file=LOG_TO_FILE, log_dir="logs")
 
-    try:
-        # OpenGLバージョンの指定（3.3 Core Profile）
-        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-        glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)  # macOSで必要
+    # ORモード: 特定レベルのみ出力する場合
+    # setup_logger(allowed_levels=ALLOWED_LEVELS, log_to_file=LOG_TO_FILE, log_dir="logs")
 
-        # ウィンドウの作成
-        window = glfw.create_window(800, 600, "PythonOpenGL - imgui", None, None)
-        if not window:
-            raise RuntimeError("ウィンドウの作成に失敗しました")
-
-        # OpenGLコンテキストを現在のスレッドに設定
-        glfw.make_context_current(window)
-
-        # imguiの初期化
-        imgui.create_context()
-        impl = GlfwRenderer(window)
-
-        # 背景色（RGBA、0.0〜1.0）
-        clear_color = [0.2, 0.2, 0.2, 1.0]
-
-        # メインループ
-        while not glfw.window_should_close(window):
-            # イベントの処理
-            glfw.poll_events()
-            impl.process_inputs()
-
-            # imguiフレーム開始
-            imgui.new_frame()
-
-            # ===== imguiウィンドウ =====
-            imgui.begin("Settings")
-
-            # 背景色の変更
-            changed, clear_color = imgui.color_edit4("Background", clear_color)
-
-            # FPSの表示
-            imgui.text(f"FPS: {imgui.get_io().framerate:.1f}")
-
-            # ボタンの例
-            if imgui.button("Reset Color"):
-                clear_color = [0.2, 0.2, 0.2, 1.0]
-
-            imgui.end()
-            # ===========================
-
-            # 背景色の適用
-            glClearColor(*clear_color)
-
-            # 画面のクリア
-            glClear(GL_COLOR_BUFFER_BIT)
-
-            # imguiのレンダリング
-            imgui.render()
-            impl.render(imgui.get_draw_data())
-
-            # バッファの入れ替え
-            glfw.swap_buffers(window)
-
-        # imguiの終了処理
-        impl.shutdown()
-
-    finally:
-        # GLFWの終了処理
-        glfw.terminate()
+    app = App()
+    app.run()
 
 
 if __name__ == '__main__':
