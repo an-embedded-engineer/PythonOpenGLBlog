@@ -229,7 +229,7 @@ PythonOpenGL/
 
 ### 公開済み記事
 
-| Phase | タイトル | URL |
-|-------|----------|-----|
-| 0 | このシリーズについて | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/232629 |
-| 1 | 開発環境を整えよう | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/234119 |
+| Phase | タイトル | 公開日 | タグ | URL |
+|-------|----------|--------|-----|-----|
+| 0 | このシリーズについて | 2025/11/29 | - | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/232629 |
+| 1 | 開発環境を整えよう | 2025/11/29 | v1.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/29/234119 |
