@@ -10,7 +10,7 @@ import OpenGL.GL as gl
 
 from src.core.window import Window
 from src.core.gui import GUI
-from src.graphics import Shader
+from src.graphics import Shader, Camera2D, Camera3D, CameraMode
 from src.graphics.transform import Transform
 from src.utils.logger import logger
 
@@ -33,7 +33,12 @@ class App:
         # 背景色（RGBA、0.0〜1.0）
         self._clear_color = [0.2, 0.2, 0.2, 1.0]
 
-        # 座標変換
+        # カメラ（2D/3D切り替え対応）
+        self._camera_2d = Camera2D(800, 600)
+        self._camera_3d = Camera3D(800, 600)
+        self._use_3d_camera = True  # 3Dカメラを使用
+
+        # 座標変換（Model行列用）
         self._transform = Transform()
 
         # Model行列の回転パラメータ（imguiで調整可能）
@@ -134,31 +139,75 @@ class App:
         imgui.end()
 
     def _draw_camera_window(self) -> None:
-        """カメラウィンドウを描画"""
+        """Draw camera window"""
         imgui.begin("Camera")
 
-        # カメラ位置
-        cam_pos = self._transform.camera_pos
-        changed_pos_x, cam_x = imgui.slider_float("Camera X##pos", cam_pos[0], -10.0, 10.0)
-        changed_pos_y, cam_y = imgui.slider_float("Camera Y##pos", cam_pos[1], -10.0, 10.0)
-        changed_pos_z, cam_z = imgui.slider_float("Camera Z##pos", cam_pos[2], -10.0, 10.0)
+        # Camera mode selection
+        mode_names = ["2D (Orthographic)", "3D (Perspective)"]
+        current_mode = 1 if self._use_3d_camera else 0
+        changed_mode, new_mode = imgui.combo("Mode", current_mode, mode_names)
+        if changed_mode:
+            self._use_3d_camera = (new_mode == 1)
 
-        if changed_pos_x or changed_pos_y or changed_pos_z:
-            self._transform.set_camera_position(cam_x, cam_y, cam_z)
+        imgui.separator()
 
-        # カメラ視点
-        cam_target = self._transform.camera_target
-        changed_tgt_x, tgt_x = imgui.slider_float("Target X##pos", cam_target[0], -5.0, 5.0)
-        changed_tgt_y, tgt_y = imgui.slider_float("Target Y##pos", cam_target[1], -5.0, 5.0)
-        changed_tgt_z, tgt_z = imgui.slider_float("Target Z##pos", cam_target[2], -5.0, 5.0)
+        if not self._use_3d_camera:
+            # === 2D Camera Settings ===
+            imgui.text("2D Camera Settings")
 
-        if changed_tgt_x or changed_tgt_y or changed_tgt_z:
-            self._transform.set_camera_target(tgt_x, tgt_y, tgt_z)
+            # Camera position (XY plane)
+            cam_pos = self._camera_2d.position
+            changed_x, cam_x = imgui.slider_float("Offset X", cam_pos[0], -5.0, 5.0)
+            changed_y, cam_y = imgui.slider_float("Offset Y", cam_pos[1], -5.0, 5.0)
+            if changed_x or changed_y:
+                self._camera_2d.set_position(cam_x, cam_y)
 
-        # 視野角
-        changed_fov, fov = imgui.slider_float("FOV", self._transform.fov, 15.0, 120.0)
-        if changed_fov:
-            self._transform.set_fov(fov)
+            # Zoom
+            changed_zoom, zoom = imgui.slider_float("Zoom", self._camera_2d.zoom, 0.1, 5.0)
+            if changed_zoom:
+                self._camera_2d.set_zoom(zoom)
+
+            # Rotation
+            changed_rot, rotation = imgui.slider_float("Rotation", self._camera_2d.rotation, 0.0, 360.0)
+            if changed_rot:
+                self._camera_2d.set_rotation(rotation)
+
+        else:
+            # === 3D Camera Settings ===
+            imgui.text("3D Camera Settings")
+
+            # Orbit (spherical coordinates around target)
+            if imgui.collapsing_header("Orbit (Rotate around target)", imgui.TreeNodeFlags_.default_open.value):
+                orbit = self._camera_3d.get_orbit()
+                changed_az, azimuth = imgui.slider_float("Azimuth", orbit[0], -180.0, 180.0)
+                changed_el, elevation = imgui.slider_float("Elevation", orbit[1], -89.0, 89.0)
+                changed_dist, distance = imgui.slider_float("Distance", orbit[2], 1.0, 20.0)
+                if changed_az or changed_el or changed_dist:
+                    self._camera_3d.set_orbit(azimuth, elevation, distance)
+
+            # Pan (parallel translation)
+            if imgui.collapsing_header("Pan (Move camera and target)", imgui.TreeNodeFlags_.default_open.value):
+                pan = self._camera_3d.pan
+                changed_pan_x, pan_x = imgui.slider_float("Pan X", pan[0], -5.0, 5.0)
+                changed_pan_y, pan_y = imgui.slider_float("Pan Y", pan[1], -5.0, 5.0)
+                changed_pan_z, pan_z = imgui.slider_float("Pan Z", pan[2], -5.0, 5.0)
+                if changed_pan_x or changed_pan_y or changed_pan_z:
+                    self._camera_3d.set_pan(pan_x, pan_y, pan_z)
+
+            # Projection settings
+            if imgui.collapsing_header("Projection", imgui.TreeNodeFlags_.default_open.value):
+                changed_fov, fov = imgui.slider_float("FOV", self._camera_3d.fov, 15.0, 120.0)
+                if changed_fov:
+                    self._camera_3d.set_fov(fov)
+
+        imgui.separator()
+
+        # Reset button
+        if imgui.button("Reset Camera"):
+            if self._use_3d_camera:
+                self._camera_3d.reset()
+            else:
+                self._camera_2d.reset()
 
         imgui.end()
 
@@ -197,25 +246,28 @@ class App:
         self._window.swap_buffers()
 
     def _draw_triangle(self) -> None:
-        """三角形を描画する"""
+        """Draw triangle"""
         if not self._shader:
             return
 
-        # Model行列を更新
+        # Update Model matrix
         self._transform.set_model_identity()
         self._transform.rotate_model_x(self._rotation_x)
         self._transform.rotate_model_y(self._rotation_y)
         self._transform.rotate_model_z(self._rotation_z)
 
-        # シェーダーを使用
+        # Use shader
         self._shader.use()
 
-        # 行列をシェーダーに設定
-        self._shader.set_mat4("model", self._transform.model)
-        self._shader.set_mat4("view", self._transform.view)
-        self._shader.set_mat4("projection", self._transform.projection)
+        # Get current camera
+        camera = self._camera_3d if self._use_3d_camera else self._camera_2d
 
-        # 三角形の描画
+        # Set matrices to shader
+        self._shader.set_mat4("model", self._transform.model)
+        self._shader.set_mat4("view", camera.view_matrix)
+        self._shader.set_mat4("projection", camera.projection_matrix)
+
+        # Draw triangle
         gl.glBindVertexArray(self._vao)
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3)
         gl.glBindVertexArray(0)
