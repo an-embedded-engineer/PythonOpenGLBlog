@@ -146,8 +146,8 @@ class CameraController:
 
             # スクリーン座標のドラッグをワールド座標の移動に変換
             # 左右ドラッグで左右移動、上下ドラッグで前後移動
-            move = -dx * self._pan_sensitivity * right - dy * self._pan_sensitivity * forward
-            self._camera_3d.translate(move[0], move[1], move[2])
+            move: np.ndarray = -dx * self._pan_sensitivity * right - dy * self._pan_sensitivity * forward
+            self._camera_3d.translate(float(move[0]), float(move[1]), float(move[2]))
 
         # 中ドラッグ: 高さ調整（上方向軸の移動）
         if self._mouse.is_middle_dragging:
