@@ -619,4 +619,4 @@ CameraBase (抽象基底クラス)
 
 **前回**: [第5回「座標変換の基礎」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/042100)
 
-**次回**: 第7回「マウスでカメラ操作」（準備中）
+**次回**: [第7回「マウスでカメラ操作」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459)

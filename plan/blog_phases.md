@@ -244,3 +244,4 @@ PythonOpenGL/
 | 4 | シェーダー入門 - 虹色の三角形を描く | 2025/11/30 | v4.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/031136 |
 | 5a | 座標変換の基礎 | 2025/11/30 | v5a.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/042100 |
 | 5b | 2D/3Dカメラの実装 | 2025/12/01 | v5b.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/204037 |
+| 5c | マウスでカメラ操作 | 2025/12/01 | v5c.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459 |
