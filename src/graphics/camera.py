@@ -18,6 +18,12 @@ class CameraMode(Enum):
     CAMERA_3D = 1  # 透視投影（3D）
 
 
+class UpAxis(Enum):
+    """上方向の軸"""
+    Y_UP = 0  # Y軸が上（OpenGL標準）
+    Z_UP = 1  # Z軸が上（CAD/工学系標準）
+
+
 class CameraBase(ABC):
     """
     カメラの基底クラス
@@ -231,22 +237,32 @@ class Camera3D(CameraBase):
     透視投影（Perspective Projection）を使用
     """
 
-    def __init__(self, width: int = 800, height: int = 600) -> None:
+    def __init__(self, width: int = 800, height: int = 600, up_axis: UpAxis = UpAxis.Y_UP) -> None:
         """
         3Dカメラを初期化する
 
         Args:
             width: ビューポートの幅
             height: ビューポートの高さ
+            up_axis: 上方向の軸（Y_UP または Z_UP）
         """
         super().__init__(width, height)
 
-        # カメラ位置
-        self._position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
+        # 上方向の軸
+        self._up_axis = up_axis
+
+        # カメラ位置（up_axisに応じて初期位置を設定）
+        if up_axis == UpAxis.Z_UP:
+            # Z-up: XY平面が地面、カメラはY負方向から見る
+            self._position = np.array([0.0, -5.0, 0.0], dtype=np.float32)
+            self._up = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        else:
+            # Y-up: XZ平面が地面、カメラはZ正方向から見る
+            self._position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
+            self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
         # カメラの視点（見る点）
         self._target = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        # 上ベクトル
-        self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
 
         # 透視投影パラメータ
         self._fov = 45.0  # 視野角（度）
@@ -257,12 +273,43 @@ class Camera3D(CameraBase):
         self._update_view_matrix()
         self._update_projection_matrix()
 
-        logger.info("Camera3D initialized")
+        logger.info(f"Camera3D initialized (up_axis={up_axis.name})")
 
     @property
     def mode(self) -> CameraMode:
         """カメラモードを取得"""
         return CameraMode.CAMERA_3D
+
+    @property
+    def up_axis(self) -> UpAxis:
+        """上方向の軸を取得"""
+        return self._up_axis
+
+    def set_up_axis(self, up_axis: UpAxis) -> None:
+        """
+        上方向の軸を設定
+
+        カメラ位置と上ベクトルを新しい座標系に合わせてリセット
+
+        Args:
+            up_axis: 上方向の軸（Y_UP または Z_UP）
+        """
+        if self._up_axis == up_axis:
+            return
+
+        self._up_axis = up_axis
+
+        # 座標系に応じてカメラをリセット
+        if up_axis == UpAxis.Z_UP:
+            self._position = np.array([0.0, -5.0, 0.0], dtype=np.float32)
+            self._up = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        else:
+            self._position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
+            self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+        self._target = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        self._update_view_matrix()
+        logger.info(f"Camera3D up_axis changed to {up_axis.name}")
 
     @property
     def position(self) -> Tuple[float, float, float]:
@@ -384,10 +431,16 @@ class Camera3D(CameraBase):
         elevation_rad = np.radians(elevation)
 
         # 球面座標からカメラ位置を計算
-        # Y-up座標系: X=右、Y=上、Z=手前
-        x = distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        y = distance * np.sin(elevation_rad)
-        z = distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        if self._up_axis == UpAxis.Z_UP:
+            # Z-up座標系: X=右、Y=奥、Z=上
+            x = distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+            y = -distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+            z = distance * np.sin(elevation_rad)
+        else:
+            # Y-up座標系: X=右、Y=上、Z=手前
+            x = distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+            y = distance * np.sin(elevation_rad)
+            z = distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
 
         # カメラ位置を更新（視点からの相対位置）
         self._position = self._target + np.array([x, y, z], dtype=np.float32)
@@ -410,11 +463,14 @@ class Camera3D(CameraBase):
         # 正規化
         rel_norm = rel / distance
 
-        # 仰角（Y成分から）
-        elevation = np.degrees(np.arcsin(np.clip(rel_norm[1], -1.0, 1.0)))
-
-        # 方位角（XZ平面上の角度）
-        azimuth = np.degrees(np.arctan2(rel_norm[0], rel_norm[2]))
+        if self._up_axis == UpAxis.Z_UP:
+            # Z-up座標系: 仰角はZ成分から、方位角はXY平面上の角度
+            elevation = np.degrees(np.arcsin(np.clip(rel_norm[2], -1.0, 1.0)))
+            azimuth = np.degrees(np.arctan2(rel_norm[0], -rel_norm[1]))
+        else:
+            # Y-up座標系: 仰角はY成分から、方位角はXZ平面上の角度
+            elevation = np.degrees(np.arcsin(np.clip(rel_norm[1], -1.0, 1.0)))
+            azimuth = np.degrees(np.arctan2(rel_norm[0], rel_norm[2]))
 
         return (float(azimuth), float(elevation), distance)
 
@@ -447,9 +503,14 @@ class Camera3D(CameraBase):
 
     def reset(self) -> None:
         """カメラをデフォルト状態にリセット"""
-        self._position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
+        if self._up_axis == UpAxis.Z_UP:
+            self._position = np.array([0.0, -5.0, 0.0], dtype=np.float32)
+            self._up = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        else:
+            self._position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
+            self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
         self._target = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self._fov = 45.0
         self._update_view_matrix()
         self._update_projection_matrix()

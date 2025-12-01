@@ -10,7 +10,9 @@ import OpenGL.GL as gl
 
 from src.core.window import Window
 from src.core.gui import GUI
-from src.graphics import Shader, Camera2D, Camera3D, CameraMode
+from src.core.mouse_controller import MouseController
+from src.core.camera_controller import CameraController
+from src.graphics import Shader, Camera2D, Camera3D, CameraMode, UpAxis
 from src.graphics.transform import Transform
 from src.utils.logger import logger
 
@@ -37,6 +39,16 @@ class App:
         self._camera_2d = Camera2D(800, 600)
         self._camera_3d = Camera3D(800, 600)
         self._use_3d_camera = True  # 3Dカメラを使用
+
+        # マウスコントローラー（GUI初期化後に作成）
+        self._mouse = MouseController(self._window.handle)
+
+        # カメラコントローラー
+        self._camera_controller = CameraController(
+            self._mouse,
+            self._camera_2d,
+            self._camera_3d,
+        )
 
         # 座標変換（Model行列用）
         self._transform = Transform()
@@ -117,6 +129,16 @@ class App:
         self._gui.process_inputs()
         self._gui.new_frame()
 
+        # imguiがマウスを使用していない場合のみカメラ操作を有効化
+        io = imgui.get_io()
+        self._camera_controller.set_enabled(not io.want_capture_mouse)
+
+        # カメラコントローラーを更新
+        self._camera_controller.update(self._use_3d_camera)
+
+        # マウスコントローラーを更新（フレーム終了時）
+        self._mouse.update()
+
         # ===== imguiウィンドウ =====
         self._draw_settings_window()
         self._draw_camera_window()
@@ -148,6 +170,14 @@ class App:
         changed_mode, new_mode = imgui.combo("Mode", current_mode, mode_names)
         if changed_mode:
             self._use_3d_camera = (new_mode == 1)
+
+        # Up axis selection (3D only)
+        if self._use_3d_camera:
+            up_axis_names = ["Y-up (OpenGL)", "Z-up (CAD)"]
+            current_up = 1 if self._camera_3d.up_axis == UpAxis.Z_UP else 0
+            changed_up, new_up = imgui.combo("Up Axis", current_up, up_axis_names)
+            if changed_up:
+                self._camera_3d.set_up_axis(UpAxis.Z_UP if new_up == 1 else UpAxis.Y_UP)
 
         imgui.separator()
 
@@ -199,6 +229,20 @@ class App:
                 changed_fov, fov = imgui.slider_float("FOV", self._camera_3d.fov, 15.0, 120.0)
                 if changed_fov:
                     self._camera_3d.set_fov(fov)
+
+        imgui.separator()
+
+        # Mouse controls help
+        if imgui.collapsing_header("Mouse Controls"):
+            if self._use_3d_camera:
+                imgui.bullet_text("Left Drag: Orbit (rotate)")
+                imgui.bullet_text("Right Drag: Pan (horizontal)")
+                imgui.bullet_text("Middle Drag: Height adjust")
+                imgui.bullet_text("Scroll: Zoom (distance)")
+            else:
+                imgui.bullet_text("Left Drag: Rotate")
+                imgui.bullet_text("Right/Middle Drag: Pan")
+                imgui.bullet_text("Scroll: Zoom")
 
         imgui.separator()
 
