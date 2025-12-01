@@ -352,5 +352,5 @@ source .venv/bin/activate && python -m src.main
 
 **前回**: [第4回「シェーダー入門 - 虹色の三角形を描く」](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/010652)
 
-**次回**: 第6回「2D/3Dカメラの実装」（準備中）
+**次回**: [第6回「2D/3Dカメラの実装」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/204037)
 
