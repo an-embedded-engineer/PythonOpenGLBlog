@@ -512,4 +512,4 @@ CameraController
 
 **前回**: [第6回「2D/3Dカメラの実装」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/204037)
 
-**次回**: 第8回「基本形状描画」（準備中）
+**次回**: [第8回「点・線・三角形を描く」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/06/015110)

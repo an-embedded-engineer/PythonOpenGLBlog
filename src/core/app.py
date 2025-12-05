@@ -1,7 +1,6 @@
 """
 アプリケーションモジュール
 """
-import ctypes
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +11,10 @@ from src.core.window import Window
 from src.core.gui import GUI
 from src.core.mouse_controller import MouseController
 from src.core.camera_controller import CameraController
-from src.graphics import Shader, Camera2D, Camera3D, CameraMode, UpAxis
+from src.graphics import (
+    Shader, Camera2D, Camera3D, CameraMode, UpAxis,
+    PointGeometry, LineGeometry, TriangleGeometry,
+)
 from src.graphics.transform import Transform
 from src.utils.logger import logger
 
@@ -58,12 +60,18 @@ class App:
         self._rotation_y = 0.0
         self._rotation_z = 0.0
 
-        # シェーダーとジオメトリの初期化
+        # シェーダーの初期化
         self._shader: Shader | None = None
-        self._vao: int = 0
-        self._vbo: int = 0
         self._setup_shader()
-        self._setup_geometry()
+
+        # ジオメトリの初期化（点・線・三角形）
+        self._point_geometry: PointGeometry | None = None
+        self._line_geometry: LineGeometry | None = None
+        self._triangle_geometry: TriangleGeometry | None = None
+        self._setup_geometries()
+
+        # 表示する形状の選択（0: 点, 1: 線, 2: 三角形, 3: すべて）
+        self._geometry_mode = 3
 
         logger.debug("App.__init__ end")
 
@@ -73,42 +81,41 @@ class App:
         fragment_path = self.SHADER_DIR / "basic.frag"
         self._shader = Shader(vertex_path, fragment_path)
 
-    def _setup_geometry(self) -> None:
-        """三角形のジオメトリをセットアップする"""
-        # 頂点データ（位置 x, y, z, 色 r, g, b）
+    def _setup_geometries(self) -> None:
+        """ジオメトリをセットアップする"""
+        # === 点ジオメトリ ===
+        self._point_geometry = PointGeometry()
+        self._point_geometry.set_point_size(8.0)
+        # サンプルの点を追加
+        self._point_geometry.add_point(-0.8, 0.8, 0.0, 1.0, 0.0, 0.0)   # 赤
+        self._point_geometry.add_point(0.0, 0.8, 0.0, 0.0, 1.0, 0.0)    # 緑
+        self._point_geometry.add_point(0.8, 0.8, 0.0, 0.0, 0.0, 1.0)    # 青
+        self._point_geometry.add_point(-0.4, 0.4, 0.0, 1.0, 1.0, 0.0)   # 黄
+        self._point_geometry.add_point(0.4, 0.4, 0.0, 1.0, 0.0, 1.0)    # マゼンタ
+        logger.info("Point geometry created")
+
+        # === 線ジオメトリ ===
+        self._line_geometry = LineGeometry()
+        self._line_geometry.set_line_width(2.0)
+        # サンプルの線を追加（座標軸風）
+        self._line_geometry.add_line(-1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0)  # X軸（赤）
+        self._line_geometry.add_line(0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0)  # Y軸（緑）
+        self._line_geometry.add_line(0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0)  # Z軸（青）
+        # グラデーション線
+        self._line_geometry.add_line_colored(
+            -0.5, -0.3, 0.0, 1.0, 0.0, 0.0,  # 始点: 赤
+            0.5, -0.3, 0.0, 0.0, 0.0, 1.0    # 終点: 青
+        )
+        logger.info("Line geometry created")
+
+        # === 三角形ジオメトリ ===
+        self._triangle_geometry = TriangleGeometry()
         # 虹色の三角形
-        vertices = np.array([
-            # 位置              # 色
-            -0.5, -0.5, 0.0,   1.0, 0.0, 0.0,  # 左下: 赤
-             0.5, -0.5, 0.0,   0.0, 1.0, 0.0,  # 右下: 緑
-             0.0,  0.5, 0.0,   0.0, 0.0, 1.0,  # 上: 青
-        ], dtype=np.float32)
-
-        # VAO（頂点配列オブジェクト）の作成
-        self._vao = gl.glGenVertexArrays(1)
-        gl.glBindVertexArray(self._vao)
-
-        # VBO（頂点バッファオブジェクト）の作成
-        self._vbo = gl.glGenBuffers(1)
-        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self._vbo)
-        gl.glBufferData(gl.GL_ARRAY_BUFFER, vertices.nbytes, vertices, gl.GL_STATIC_DRAW)
-
-        # 頂点属性の設定
-        stride = 6 * vertices.itemsize  # 1頂点あたり6つのfloat（位置3 + 色3）
-
-        # 属性0: 位置（location = 0）
-        gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, stride, None)
-        gl.glEnableVertexAttribArray(0)
-
-        # 属性1: 色（location = 1）
-        offset = 3 * vertices.itemsize  # 色データのオフセット（位置の後）
-        gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, stride, ctypes.c_void_p(offset))
-        gl.glEnableVertexAttribArray(1)
-
-        # バインド解除
-        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0)
-        gl.glBindVertexArray(0)
-
+        self._triangle_geometry.add_triangle_colored(
+            -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,  # 左下: 赤
+            0.5, -0.5, 0.0, 0.0, 1.0, 0.0,   # 右下: 緑
+            0.0, 0.5, 0.0, 0.0, 0.0, 1.0     # 上: 青
+        )
         logger.info("Triangle geometry created")
 
     def run(self) -> None:
@@ -143,6 +150,7 @@ class App:
         self._draw_settings_window()
         self._draw_camera_window()
         self._draw_transform_window()
+        self._draw_geometry_window()
 
     def _draw_settings_window(self) -> None:
         """設定ウィンドウを描画"""
@@ -272,16 +280,106 @@ class App:
 
         imgui.end()
 
+    def _draw_geometry_window(self) -> None:
+        """形状ウィンドウを描画"""
+        imgui.begin("Geometry")
+
+        # 表示モードの選択
+        mode_names = ["Points", "Lines", "Triangles", "All"]
+        changed, self._geometry_mode = imgui.combo("Display Mode", self._geometry_mode, mode_names)
+
+        imgui.separator()
+
+        # === 点の設定 ===
+        if imgui.collapsing_header("Points", imgui.TreeNodeFlags_.default_open.value):
+            if self._point_geometry:
+                # 点のサイズ
+                changed_size, size = imgui.slider_float(
+                    "Point Size", self._point_geometry.point_size, 1.0, 20.0
+                )
+                if changed_size:
+                    self._point_geometry.set_point_size(size)
+
+                imgui.text(f"Point Count: {self._point_geometry.vertex_count}")
+
+                if imgui.button("Clear Points"):
+                    self._point_geometry.clear()
+
+                if imgui.button("Add Random Point"):
+                    import random
+                    x = random.uniform(-1.0, 1.0)
+                    y = random.uniform(-1.0, 1.0)
+                    z = random.uniform(-0.5, 0.5)
+                    r = random.uniform(0.0, 1.0)
+                    g = random.uniform(0.0, 1.0)
+                    b = random.uniform(0.0, 1.0)
+                    self._point_geometry.add_point(x, y, z, r, g, b)
+
+        # === 線の設定 ===
+        if imgui.collapsing_header("Lines", imgui.TreeNodeFlags_.default_open.value):
+            if self._line_geometry:
+                # Note: macOS Core Profileでは glLineWidth() は 1.0 のみサポート
+                # そのためLine Widthスライダーは省略
+
+                imgui.text(f"Line Count: {len(self._line_geometry.lines)}")
+
+                if imgui.button("Clear Lines"):
+                    self._line_geometry.clear()
+
+                if imgui.button("Add Random Line"):
+                    import random
+                    x1, y1 = random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0)
+                    x2, y2 = random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0)
+                    r = random.uniform(0.0, 1.0)
+                    g = random.uniform(0.0, 1.0)
+                    b = random.uniform(0.0, 1.0)
+                    self._line_geometry.add_line(x1, y1, 0.0, x2, y2, 0.0, r, g, b)
+
+        # === 三角形の設定 ===
+        if imgui.collapsing_header("Triangles", imgui.TreeNodeFlags_.default_open.value):
+            if self._triangle_geometry:
+                imgui.text(f"Triangle Count: {len(self._triangle_geometry.triangles)}")
+
+                if imgui.button("Clear Triangles"):
+                    self._triangle_geometry.clear()
+
+                if imgui.button("Add Random Triangle"):
+                    import random
+                    # ランダムな中心位置
+                    cx = random.uniform(-0.5, 0.5)
+                    cy = random.uniform(-0.5, 0.5)
+                    size = random.uniform(0.1, 0.3)
+                    # ランダムな色
+                    r1, g1, b1 = random.random(), random.random(), random.random()
+                    r2, g2, b2 = random.random(), random.random(), random.random()
+                    r3, g3, b3 = random.random(), random.random(), random.random()
+                    self._triangle_geometry.add_triangle_colored(
+                        cx - size, cy - size, 0.0, r1, g1, b1,
+                        cx + size, cy - size, 0.0, r2, g2, b2,
+                        cx, cy + size, 0.0, r3, g3, b3
+                    )
+
+        imgui.separator()
+
+        # すべてリセット
+        if imgui.button("Reset All Geometries"):
+            self._setup_geometries()
+
+        imgui.end()
+
     def _render(self) -> None:
         """描画処理"""
         # 背景色の適用
         gl.glClearColor(*self._clear_color)
 
-        # 画面のクリア
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        # 深度テストを有効化（3D描画用）
+        gl.glEnable(gl.GL_DEPTH_TEST)
 
-        # 三角形の描画
-        self._draw_triangle()
+        # 画面のクリア
+        gl.glClear(int(gl.GL_COLOR_BUFFER_BIT) | int(gl.GL_DEPTH_BUFFER_BIT))
+
+        # ジオメトリの描画
+        self._draw_geometries()
 
         # imguiのレンダリング
         self._gui.render()
@@ -289,40 +387,53 @@ class App:
         # バッファの入れ替え
         self._window.swap_buffers()
 
-    def _draw_triangle(self) -> None:
-        """Draw triangle"""
+    def _draw_geometries(self) -> None:
+        """ジオメトリを描画する"""
         if not self._shader:
             return
 
-        # Update Model matrix
+        # Model行列を更新
         self._transform.set_model_identity()
         self._transform.rotate_model_x(self._rotation_x)
         self._transform.rotate_model_y(self._rotation_y)
         self._transform.rotate_model_z(self._rotation_z)
 
-        # Use shader
+        # シェーダーを使用
         self._shader.use()
 
-        # Get current camera
+        # 現在のカメラを取得
         camera = self._camera_3d if self._use_3d_camera else self._camera_2d
 
-        # Set matrices to shader
+        # 行列をシェーダーに設定
         self._shader.set_mat4("model", self._transform.model)
         self._shader.set_mat4("view", camera.view_matrix)
         self._shader.set_mat4("projection", camera.projection_matrix)
 
-        # Draw triangle
-        gl.glBindVertexArray(self._vao)
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3)
-        gl.glBindVertexArray(0)
+        # 形状の描画（モードに応じて）
+        # 0: Points, 1: Lines, 2: Triangles, 3: All
+        if self._geometry_mode == 0 or self._geometry_mode == 3:
+            if self._point_geometry:
+                self._point_geometry.draw()
+
+        if self._geometry_mode == 1 or self._geometry_mode == 3:
+            if self._line_geometry:
+                self._line_geometry.draw()
+
+        if self._geometry_mode == 2 or self._geometry_mode == 3:
+            if self._triangle_geometry:
+                self._triangle_geometry.draw()
 
     def _shutdown(self) -> None:
         """終了処理"""
-        # OpenGLリソースの解放
-        if self._vao:
-            gl.glDeleteVertexArrays(1, [self._vao])
-        if self._vbo:
-            gl.glDeleteBuffers(1, [self._vbo])
+        # ジオメトリリソースの解放
+        if self._point_geometry:
+            self._point_geometry.cleanup()
+        if self._line_geometry:
+            self._line_geometry.cleanup()
+        if self._triangle_geometry:
+            self._triangle_geometry.cleanup()
+
+        # シェーダーの解放
         if self._shader:
             self._shader.delete()
 

@@ -87,6 +87,7 @@ AIと人間が協力してコードと記事を作り上げていく様子も、
 | 第5回 | [座標変換の基礎](https://an-embedded-engineer.hateblo.jp/entry/2025/11/30/042100) | 2025/11/30 |
 | 第6回 | [2D/3Dカメラの実装](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/204037) | 2025/12/01 |
 | 第7回 | [マウスでカメラ操作](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459) | 2025/12/01 |
+| 第8回 | [点・線・三角形を描く](https://an-embedded-engineer.hateblo.jp/entry/2025/12/06/015110) | 2025/12/06 |
 
 ### サンプルコードの入手方法
 
