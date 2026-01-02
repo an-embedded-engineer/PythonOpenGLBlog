@@ -10,6 +10,86 @@
 
 今回は、**EBO（Element Buffer Object / Index Buffer）**を使って、より複雑な形状を効率的に描画する方法を学びます。具体的には、**矩形（Rectangle）**、**立方体（Cube）**、**球体（Sphere）**の描画を実装します。
 
+また、OpenGL操作を抽象化する**BufferManagerパターン**を導入し、テスト容易性を向上させます。
+
+### BufferManagerパターンの実装
+
+複雑な形状を実装する前に、まずOpenGL操作を抽象化する設計パターンを導入します。これにより、以下のメリットが得られます：
+
+1. **テスト容易性**: OpenGLコンテキスト不要でユニットテストが可能
+2. **依存性注入**: 実装とテストを切り離せる
+3. **保守性**: OpenGL呼び出しが一箇所に集約される
+
+#### BufferManager Protocol
+
+`src/graphics/geometry.py`:
+
+```python
+class BufferManager(Protocol):
+    """OpenGL操作の抽象化インターフェース"""
+
+    def create_buffers(
+        self,
+        vertices: np.ndarray,
+        primitive_type: PrimitiveType
+    ) -> tuple[int, int]:
+        """VBO/VAOを作成"""
+        ...
+
+    def create_indexed_buffers(
+        self,
+        vertices: np.ndarray,
+        indices: np.ndarray,
+        primitive_type: PrimitiveType
+    ) -> tuple[int, int, int]:
+        """VBO/VAO/EBOを作成"""
+        ...
+
+    def draw_arrays(self, vao: int, vertex_count: int, primitive_type: PrimitiveType) -> None:
+        """通常描画（VBOのみ）"""
+        ...
+
+    def draw_elements(self, vao: int, index_count: int, primitive_type: PrimitiveType) -> None:
+        """インデックス描画（VBO + EBO）"""
+        ...
+```
+
+実装クラス`OpenGLBufferManager`が実際のOpenGL関数を呼び出します。
+
+### BufferManagerのテスト容易性
+
+このパターンにより、`MockBufferManager`を使ってOpenGLコンテキスト不要なユニットテストを実現できます：
+
+```python
+# tests/test_geometry.py
+class MockBufferManager:
+    """テスト用のモックBufferManager"""
+
+    def create_indexed_buffers(self, vertices, indices, primitive_type):
+        # 実際のOpenGL呼び出しなし、ダミーID返却
+        return (1, 2, 3)  # VAO, VBO, EBO
+
+    def draw_elements(self, vao, index_count, primitive_type):
+        # 描画記録のみ
+        self.draw_calls.append(("elements", vao, index_count))
+
+# テスト例
+def test_rectangle_init():
+    mock = MockBufferManager()
+    rect = RectangleGeometry(width=2.0, height=1.5, buffer_manager=mock)
+
+    assert rect.vertex_count == 4
+    assert rect.index_count == 6
+    assert mock.created_buffers_count == 1
+```
+
+全22テストがOpenGL初期化なしで実行可能です：
+
+```bash
+pytest tests/test_geometry.py -v
+# ====================== 22 passed in 0.64s ======================
+```
+
 ### EBOとは何か？
 
 #### 頂点の重複問題
@@ -54,50 +134,6 @@ EBO: インデックスデータ6つ
 ```
 
 これにより、頂点データの重複を削減し、**メモリ効率**と**転送効率**が向上します。
-
-### BufferManagerパターンの実装
-
-前回のリファクタリングで、OpenGL操作を抽象化する`BufferManager`を導入しました。これにより、以下のメリットがあります：
-
-1. **テスト容易性**: OpenGLコンテキスト不要でユニットテストが可能
-2. **依存性注入**: 実装とテストを切り離せる
-3. **保守性**: OpenGL呼び出しが一箇所に集約される
-
-#### BufferManager Protocol
-
-`src/graphics/geometry.py`:
-
-```python
-class BufferManager(Protocol):
-    """OpenGL操作の抽象化インターフェース"""
-
-    def create_buffers(
-        self,
-        vertices: np.ndarray,
-        primitive_type: PrimitiveType
-    ) -> tuple[int, int]:
-        """VBO/VAOを作成"""
-        ...
-
-    def create_indexed_buffers(
-        self,
-        vertices: np.ndarray,
-        indices: np.ndarray,
-        primitive_type: PrimitiveType
-    ) -> tuple[int, int, int]:
-        """VBO/VAO/EBOを作成"""
-        ...
-
-    def draw_arrays(self, vao: int, vertex_count: int, primitive_type: PrimitiveType) -> None:
-        """通常描画（VBOのみ）"""
-        ...
-
-    def draw_elements(self, vao: int, index_count: int, primitive_type: PrimitiveType) -> None:
-        """インデックス描画（VBO + EBO）"""
-        ...
-```
-
-実装クラス`OpenGLBufferManager`が実際のOpenGL関数を呼び出します。
 
 ### 矩形（Rectangle）の実装
 
@@ -335,7 +371,7 @@ def _draw_geometry_window(self) -> None:
         changed_r, self._sphere_radius = imgui.slider_float("Radius", self._sphere_radius, 0.1, 3.0)
         changed_seg, self._sphere_segments = imgui.slider_int("Segments", self._sphere_segments, 4, 64)
         changed_ring, self._sphere_rings = imgui.slider_int("Rings", self._sphere_rings, 2, 64)
-        
+
         if changed_r or changed_seg or changed_ring:
             # 球体を再生成
             self._sphere_geometry.cleanup()
@@ -415,50 +451,16 @@ Point/Line/Triangle + Rectangle/Cube/Sphere（各3個）を同時に表示。ラ
 
 全頂点に異なる色を設定。経度・緯度分割による美しいグラデーション球体。
 
-### BufferManagerのテスト容易性
-
-今回のリファクタリングで、`MockBufferManager`を使ってOpenGLコンテキスト不要なユニットテストを実現しました：
-
-```python
-# tests/test_geometry.py
-class MockBufferManager:
-    """テスト用のモックBufferManager"""
-    
-    def create_indexed_buffers(self, vertices, indices, primitive_type):
-        # 実際のOpenGL呼び出しなし、ダミーID返却
-        return (1, 2, 3)  # VAO, VBO, EBO
-    
-    def draw_elements(self, vao, index_count, primitive_type):
-        # 描画記録のみ
-        self.draw_calls.append(("elements", vao, index_count))
-
-# テスト例
-def test_rectangle_init():
-    mock = MockBufferManager()
-    rect = RectangleGeometry(width=2.0, height=1.5, buffer_manager=mock)
-    
-    assert rect.vertex_count == 4
-    assert rect.index_count == 6
-    assert mock.created_buffers_count == 1
-```
-
-全22テストがOpenGL初期化なしで実行可能です：
-
-```bash
-pytest tests/test_geometry.py -v
-# ====================== 22 passed in 0.64s ======================
-```
-
 ### まとめ
 
 今回は、**EBO（インデックスバッファ）**を使って複雑な形状を効率的に描画する方法を学びました。
 
 **学んだこと**：
-1. EBOによる頂点の再利用（メモリ効率向上）
-2. 矩形の実装（4頂点、6インデックス）
-3. 立方体の実装（8頂点、36インデックス）
-4. 球体の生成アルゴリズム（経度・緯度分割）
-5. BufferManagerパターンによるテスト容易性
+1. BufferManagerパターンによるテスト容易性
+2. EBOによる頂点の再利用（メモリ効率向上）
+3. 矩形の実装（4頂点、6インデックス）
+4. 立方体の実装（8頂点、36インデックス）
+5. 球体の生成アルゴリズム（経度・緯度分割）
 
 **次回予告**：
 次回は、「**バッチ描画による高速化**」を実装します。複数オブジェクトの描画を効率化し、ドローコールのオーバーヘッドを削減します。
