@@ -535,4 +535,4 @@ src/
 
 **前回**: [第7回「マウスでカメラ操作」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459)
 
-**次回**: 第9回「立方体と球体を描く」（準備中）
+**次回**: [第9回「立方体と球体を描く - EBOで頂点を再利用」](https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/024815)
