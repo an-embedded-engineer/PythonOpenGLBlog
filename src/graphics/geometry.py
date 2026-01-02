@@ -645,6 +645,28 @@ class RectangleGeometry(GeometryBase):
         self._color = (r, g, b)
         self._update_buffers()
 
+    def set_random_colors(self) -> None:
+        """各頂点にランダムな色を設定（グラデーション効果）"""
+        import random
+        w = self._width / 2.0
+        h = self._height / 2.0
+
+        # 各頂点に異なるランダム色を設定
+        vertices = np.array([
+            # 位置           色
+            -w, -h, 0.0,  random.random(), random.random(), random.random(),  # 左下
+             w, -h, 0.0,  random.random(), random.random(), random.random(),  # 右下
+             w,  h, 0.0,  random.random(), random.random(), random.random(),  # 右上
+            -w,  h, 0.0,  random.random(), random.random(), random.random(),  # 左上
+        ], dtype=np.float32)
+
+        indices = np.array([
+            0, 1, 2,
+            2, 3, 0,
+        ], dtype=np.uint32)
+
+        self._create_indexed_buffers(vertices, indices)
+
     def _update_buffers(self) -> None:
         """バッファを更新する"""
         w = self._width / 2.0
@@ -716,6 +738,35 @@ class CubeGeometry(GeometryBase):
         """色を変更"""
         self._color = (r, g, b)
         self._update_buffers()
+
+    def set_random_colors(self) -> None:
+        """各頂点にランダムな色を設定（グラデーション効果）"""
+        import random
+        s = self._size / 2.0
+
+        # 8頂点にそれぞれ異なるランダム色を設定
+        vertices = np.array([
+            # 位置              色
+            -s, -s,  s,  random.random(), random.random(), random.random(),  # 0
+             s, -s,  s,  random.random(), random.random(), random.random(),  # 1
+             s,  s,  s,  random.random(), random.random(), random.random(),  # 2
+            -s,  s,  s,  random.random(), random.random(), random.random(),  # 3
+            -s, -s, -s,  random.random(), random.random(), random.random(),  # 4
+             s, -s, -s,  random.random(), random.random(), random.random(),  # 5
+             s,  s, -s,  random.random(), random.random(), random.random(),  # 6
+            -s,  s, -s,  random.random(), random.random(), random.random(),  # 7
+        ], dtype=np.float32)
+
+        indices = np.array([
+            0, 1, 2, 0, 2, 3,  # 前面
+            5, 4, 7, 5, 7, 6,  # 背面
+            4, 0, 3, 4, 3, 7,  # 左面
+            1, 5, 6, 1, 6, 2,  # 右面
+            3, 2, 6, 3, 6, 7,  # 上面
+            4, 5, 1, 4, 1, 0,  # 底面
+        ], dtype=np.uint32)
+
+        self._create_indexed_buffers(vertices, indices)
 
     def _update_buffers(self) -> None:
         """バッファを更新する"""
@@ -809,6 +860,44 @@ class SphereGeometry(GeometryBase):
         """色を変更"""
         self._color = (r, g, b)
         self._update_buffers()
+
+    def set_random_colors(self) -> None:
+        """各頂点にランダムな色を設定（グラデーション効果）"""
+        import random
+        vertices = []
+        indices = []
+
+        # 頂点生成（各頂点にランダム色）
+        for ring in range(self._rings + 1):
+            theta = np.pi * ring / self._rings
+            sin_theta = np.sin(theta)
+            cos_theta = np.cos(theta)
+
+            for segment in range(self._segments + 1):
+                phi = 2.0 * np.pi * segment / self._segments
+                sin_phi = np.sin(phi)
+                cos_phi = np.cos(phi)
+
+                x = self._radius * sin_theta * cos_phi
+                y = self._radius * cos_theta
+                z = self._radius * sin_theta * sin_phi
+
+                # 各頂点にランダム色を設定
+                vertices.extend([x, y, z, random.random(), random.random(), random.random()])
+
+        # インデックス生成
+        for ring in range(self._rings):
+            for segment in range(self._segments):
+                first = ring * (self._segments + 1) + segment
+                second = first + self._segments + 1
+
+                indices.extend([first, second, first + 1])
+                indices.extend([second, second + 1, first + 1])
+
+        vertices = np.array(vertices, dtype=np.float32)
+        indices = np.array(indices, dtype=np.uint32)
+
+        self._create_indexed_buffers(vertices, indices)
 
     def _update_buffers(self) -> None:
         """バッファを更新する"""

@@ -2,6 +2,7 @@
 アプリケーションモジュール
 """
 from pathlib import Path
+import random
 
 import numpy as np
 from imgui_bundle import imgui
@@ -14,6 +15,7 @@ from src.core.camera_controller import CameraController
 from src.graphics import (
     Shader, Camera2D, Camera3D, CameraMode, UpAxis,
     PointGeometry, LineGeometry, TriangleGeometry,
+    RectangleGeometry, CubeGeometry, SphereGeometry,
 )
 from src.graphics.transform import Transform
 from src.utils.logger import logger
@@ -64,14 +66,33 @@ class App:
         self._shader: Shader | None = None
         self._setup_shader()
 
+        # Rectangle/Cube/Sphereのパラメータ（ジオメトリ初期化前に定義）
+        self._rectangle_width = 1.0
+        self._rectangle_height = 1.0
+        self._cube_size = 1.0
+        self._sphere_radius = 1.0
+        self._sphere_segments = 16
+        self._sphere_rings = 16
+        self._shape_color = [0.5, 0.5, 1.0, 1.0]  # 水色
+
         # ジオメトリの初期化（点・線・三角形）
         self._point_geometry: PointGeometry | None = None
         self._line_geometry: LineGeometry | None = None
         self._triangle_geometry: TriangleGeometry | None = None
+        self._rectangle_geometry: RectangleGeometry | None = None
+        self._cube_geometry: CubeGeometry | None = None
+        self._sphere_geometry: SphereGeometry | None = None
         self._setup_geometries()
 
-        # 表示する形状の選択（0: 点, 1: 線, 2: 三角形, 3: すべて）
+        # 表示する形状の選択（0: 点, 1: 線, 2: 三角形, 3: すべて, 4: 矩形, 5: 立方体, 6: 球体）
         self._geometry_mode = 3
+
+        # ワイヤフレームモード
+        self._wireframe_mode = False
+
+        # Allモード用の複数オブジェクト（位置とスケール）
+        self._all_mode_objects: list[dict] = []
+        self._generate_all_mode_objects()
 
         logger.debug("App.__init__ end")
 
@@ -117,6 +138,65 @@ class App:
             0.0, 0.5, 0.0, 0.0, 0.0, 1.0     # 上: 青
         )
         logger.info("Triangle geometry created")
+
+        # === 矩形ジオメトリ ===
+        self._rectangle_geometry = RectangleGeometry(
+            width=self._rectangle_width,
+            height=self._rectangle_height,
+            r=self._shape_color[0],
+            g=self._shape_color[1],
+            b=self._shape_color[2],
+        )
+        logger.info("Rectangle geometry created")
+
+        # === 立方体ジオメトリ ===
+        self._cube_geometry = CubeGeometry(
+            size=self._cube_size,
+            r=self._shape_color[0],
+            g=self._shape_color[1],
+            b=self._shape_color[2],
+        )
+        logger.info("Cube geometry created")
+
+        # === 球体ジオメトリ ===
+        self._sphere_geometry = SphereGeometry(
+            radius=self._sphere_radius,
+            segments=self._sphere_segments,
+            rings=self._sphere_rings,
+            r=self._shape_color[0],
+            g=self._shape_color[1],
+            b=self._shape_color[2],
+        )
+        logger.info("Sphere geometry created")
+
+    def _generate_all_mode_objects(self) -> None:
+        """Allモード用のランダムオブジェクトを生成"""
+        self._all_mode_objects = []
+        # Rectangle 3個
+        for _ in range(3):
+            self._all_mode_objects.append({
+                'type': 'rectangle',
+                'pos': [random.uniform(-2, 2), random.uniform(-2, 2), random.uniform(-1, 1)],
+                'scale': random.uniform(0.3, 0.8),
+                'color': [random.random(), random.random(), random.random()]
+            })
+        # Cube 3個
+        for _ in range(3):
+            self._all_mode_objects.append({
+                'type': 'cube',
+                'pos': [random.uniform(-2, 2), random.uniform(-2, 2), random.uniform(-1, 1)],
+                'scale': random.uniform(0.3, 0.8),
+                'color': [random.random(), random.random(), random.random()]
+            })
+        # Sphere 3個
+        for _ in range(3):
+            self._all_mode_objects.append({
+                'type': 'sphere',
+                'pos': [random.uniform(-2, 2), random.uniform(-2, 2), random.uniform(-1, 1)],
+                'scale': random.uniform(0.3, 0.8),
+                'color': [random.random(), random.random(), random.random()]
+            })
+        logger.info(f"Generated {len(self._all_mode_objects)} objects for All mode")
 
     def run(self) -> None:
         """メインループを実行する"""
@@ -285,8 +365,16 @@ class App:
         imgui.begin("Geometry")
 
         # 表示モードの選択
-        mode_names = ["Points", "Lines", "Triangles", "All"]
+        mode_names = ["Points", "Lines", "Triangles", "All", "Rectangle", "Cube", "Sphere"]
         changed, self._geometry_mode = imgui.combo("Display Mode", self._geometry_mode, mode_names)
+
+        # ワイヤフレームモード
+        changed_wire, self._wireframe_mode = imgui.checkbox("Wireframe Mode", self._wireframe_mode)
+
+        # Allモード用のオブジェクト再生成ボタン
+        if self._geometry_mode == 3:  # All mode
+            if imgui.button("Regenerate All Objects"):
+                self._generate_all_mode_objects()
 
         imgui.separator()
 
@@ -306,7 +394,6 @@ class App:
                     self._point_geometry.clear()
 
                 if imgui.button("Add Random Point"):
-                    import random
                     x = random.uniform(-1.0, 1.0)
                     y = random.uniform(-1.0, 1.0)
                     z = random.uniform(-0.5, 0.5)
@@ -327,7 +414,6 @@ class App:
                     self._line_geometry.clear()
 
                 if imgui.button("Add Random Line"):
-                    import random
                     x1, y1 = random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0)
                     x2, y2 = random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0)
                     r = random.uniform(0.0, 1.0)
@@ -344,7 +430,6 @@ class App:
                     self._triangle_geometry.clear()
 
                 if imgui.button("Add Random Triangle"):
-                    import random
                     # ランダムな中心位置
                     cx = random.uniform(-0.5, 0.5)
                     cy = random.uniform(-0.5, 0.5)
@@ -358,6 +443,75 @@ class App:
                         cx + size, cy - size, 0.0, r2, g2, b2,
                         cx, cy + size, 0.0, r3, g3, b3
                     )
+
+        # === 矩形の設定 ===
+        if imgui.collapsing_header("Rectangle", imgui.TreeNodeFlags_.default_open.value):
+            changed_w, self._rectangle_width = imgui.slider_float("Width", self._rectangle_width, 0.1, 3.0)
+            changed_h, self._rectangle_height = imgui.slider_float("Height", self._rectangle_height, 0.1, 3.0)
+            if changed_w or changed_h:
+                if self._rectangle_geometry:
+                    self._rectangle_geometry.set_size(self._rectangle_width, self._rectangle_height)
+
+            changed_color, self._shape_color = imgui.color_edit4("Color", self._shape_color)
+            if changed_color and self._rectangle_geometry:
+                self._rectangle_geometry.set_color(*self._shape_color[:3])
+
+            if self._rectangle_geometry:
+                imgui.text(f"Vertices: {self._rectangle_geometry.vertex_count}")
+                imgui.text(f"Indices: {self._rectangle_geometry.index_count}")
+
+            if imgui.button("Random Color##rect"):
+                if self._rectangle_geometry:
+                    self._rectangle_geometry.set_random_colors()
+
+        # === 立方体の設定 ===
+        if imgui.collapsing_header("Cube", imgui.TreeNodeFlags_.default_open.value):
+            changed_s, self._cube_size = imgui.slider_float("Size", self._cube_size, 0.1, 3.0)
+            if changed_s and self._cube_geometry:
+                self._cube_geometry.set_size(self._cube_size)
+
+            changed_color, self._shape_color = imgui.color_edit4("Color##cube", self._shape_color)
+            if changed_color and self._cube_geometry:
+                self._cube_geometry.set_color(*self._shape_color[:3])
+
+            if self._cube_geometry:
+                imgui.text(f"Vertices: {self._cube_geometry.vertex_count}")
+                imgui.text(f"Indices: {self._cube_geometry.index_count}")
+
+            if imgui.button("Random Color##cube"):
+                if self._cube_geometry:
+                    self._cube_geometry.set_random_colors()
+
+        # === 球体の設定 ===
+        if imgui.collapsing_header("Sphere", imgui.TreeNodeFlags_.default_open.value):
+            changed_r, self._sphere_radius = imgui.slider_float("Radius", self._sphere_radius, 0.1, 3.0)
+            changed_seg, self._sphere_segments = imgui.slider_int("Segments", self._sphere_segments, 4, 64)
+            changed_ring, self._sphere_rings = imgui.slider_int("Rings", self._sphere_rings, 2, 64)
+
+            if changed_r or changed_seg or changed_ring:
+                # 球体を再生成
+                if self._sphere_geometry:
+                    self._sphere_geometry.cleanup()
+                self._sphere_geometry = SphereGeometry(
+                    radius=self._sphere_radius,
+                    segments=self._sphere_segments,
+                    rings=self._sphere_rings,
+                    r=self._shape_color[0],
+                    g=self._shape_color[1],
+                    b=self._shape_color[2],
+                )
+
+            changed_color, self._shape_color = imgui.color_edit4("Color##sphere", self._shape_color)
+            if changed_color and self._sphere_geometry:
+                self._sphere_geometry.set_color(*self._shape_color[:3])
+
+            if self._sphere_geometry:
+                imgui.text(f"Vertices: {self._sphere_geometry.vertex_count}")
+                imgui.text(f"Indices: {self._sphere_geometry.index_count}")
+
+            if imgui.button("Random Color##sphere"):
+                if self._sphere_geometry:
+                    self._sphere_geometry.set_random_colors()
 
         imgui.separator()
 
@@ -392,6 +546,12 @@ class App:
         if not self._shader:
             return
 
+        # ワイヤフレームモードの設定
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
+        else:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
         # Model行列を更新
         self._transform.set_model_identity()
         self._transform.rotate_model_x(self._rotation_x)
@@ -410,7 +570,7 @@ class App:
         self._shader.set_mat4("projection", camera.projection_matrix)
 
         # 形状の描画（モードに応じて）
-        # 0: Points, 1: Lines, 2: Triangles, 3: All
+        # 0: Points, 1: Lines, 2: Triangles, 3: All, 4: Rectangle, 5: Cube, 6: Sphere
         if self._geometry_mode == 0 or self._geometry_mode == 3:
             if self._point_geometry:
                 self._point_geometry.draw()
@@ -423,6 +583,52 @@ class App:
             if self._triangle_geometry:
                 self._triangle_geometry.draw()
 
+        # Allモードの場合、複数のRectangle/Cube/Sphereを描画
+        if self._geometry_mode == 3:
+            for obj in self._all_mode_objects:
+                # 個別のModel行列を設定
+                self._transform.set_model_identity()
+                self._transform.translate_model(obj['pos'][0], obj['pos'][1], obj['pos'][2])
+                self._transform.scale_model(obj['scale'], obj['scale'], obj['scale'])
+                self._transform.rotate_model_x(self._rotation_x)
+                self._transform.rotate_model_y(self._rotation_y)
+                self._transform.rotate_model_z(self._rotation_z)
+                self._shader.set_mat4("model", self._transform.model)
+
+                # オブジェクトタイプに応じて描画
+                if obj['type'] == 'rectangle' and self._rectangle_geometry:
+                    # 一時的に色を変更
+                    original_color = self._rectangle_geometry._color
+                    self._rectangle_geometry.set_color(*obj['color'])
+                    self._rectangle_geometry.draw()
+                    self._rectangle_geometry.set_color(*original_color)
+                elif obj['type'] == 'cube' and self._cube_geometry:
+                    original_color = self._cube_geometry._color
+                    self._cube_geometry.set_color(*obj['color'])
+                    self._cube_geometry.draw()
+                    self._cube_geometry.set_color(*original_color)
+                elif obj['type'] == 'sphere' and self._sphere_geometry:
+                    original_color = self._sphere_geometry._color
+                    self._sphere_geometry.set_color(*obj['color'])
+                    self._sphere_geometry.draw()
+                    self._sphere_geometry.set_color(*original_color)
+
+        if self._geometry_mode == 4:
+            if self._rectangle_geometry:
+                self._rectangle_geometry.draw()
+
+        if self._geometry_mode == 5:
+            if self._cube_geometry:
+                self._cube_geometry.draw()
+
+        if self._geometry_mode == 6:
+            if self._sphere_geometry:
+                self._sphere_geometry.draw()
+
+        # ワイヤフレームモードをリセット
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
     def _shutdown(self) -> None:
         """終了処理"""
         # ジオメトリリソースの解放
@@ -432,6 +638,12 @@ class App:
             self._line_geometry.cleanup()
         if self._triangle_geometry:
             self._triangle_geometry.cleanup()
+        if self._rectangle_geometry:
+            self._rectangle_geometry.cleanup()
+        if self._cube_geometry:
+            self._cube_geometry.cleanup()
+        if self._sphere_geometry:
+            self._sphere_geometry.cleanup()
 
         # シェーダーの解放
         if self._shader:
