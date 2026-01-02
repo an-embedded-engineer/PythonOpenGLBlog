@@ -253,18 +253,16 @@ class CubeGeometry(GeometryBase):
 
 球体は**経度（longitude）**と**緯度（latitude）**で分割して生成します。
 
-球面上の点$(x, y, z)$は、半径$r$、経度$\theta$、緯度$\phi$から：
+球面上の点 (x, y, z) は、半径 r、経度 θ（シータ）、緯度 φ（ファイ）から計算します：
 
-$$
-\begin{cases}
-x = r \cdot \cos(\phi) \cdot \cos(\theta) \\\\
-y = r \cdot \sin(\phi) \\\\
-z = r \cdot \cos(\phi) \cdot \sin(\theta)
-\end{cases}
-$$
+```
+x = r × cos(φ) × cos(θ)
+y = r × sin(φ)
+z = r × cos(φ) × sin(θ)
+```
 
-- $\theta$: 経度（0〜2π）、水平方向の角度
-- $\phi$: 緯度（-π/2〜π/2）、垂直方向の角度
+- **θ（経度）**: 0〜2π、水平方向の角度
+- **φ（緯度）**: -π/2〜π/2、垂直方向の角度
 
 #### 頂点生成アルゴリズム
 
@@ -303,12 +301,12 @@ def _generate_vertices(self) -> tuple[np.ndarray, np.ndarray]:
 
 #### 頂点数・インデックス数
 
-- **頂点数**: $(rings + 1) \times (segments + 1)$
-- **インデックス数**: $rings \times segments \times 6$
+- **頂点数**: (rings + 1) × (segments + 1)
+- **インデックス数**: rings × segments × 6
 
 例：`segments=16, rings=16`の場合：
-- 頂点数: $17 \times 17 = 289$
-- インデックス数: $16 \times 16 \times 6 = 1536$
+- 頂点数: 17 × 17 = 289
+- インデックス数: 16 × 16 × 6 = 1536
 
 ### アプリケーションへの統合
 
