@@ -467,4 +467,4 @@ Point/Line/Triangle + Rectangle/Cube/Sphere（各3個）を同時に表示。ラ
 
 **前回**: [第8回「点・線・三角形を描く」](https://an-embedded-engineer.hateblo.jp/entry/2025/12/06/015110)
 
-**次回**: 第10回「バッチ描画による高速化」（準備中）
+**次回**: [第10回「バッチレンダリングで描画を高速化」](https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/121748)

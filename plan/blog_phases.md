@@ -247,3 +247,4 @@ PythonOpenGL/
 | 5c | マウスでカメラ操作 | 2025/12/01 | v5c.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459 |
 | 6a | 点・線・三角形を描く | 2025/12/06 | v6a.0 | https://an-embedded-engineer.hateblo.jp/entry/2025/12/06/015110 |
 | 6b | 立方体と球体を描く - EBOで頂点を再利用 | 2026/01/03 | v6b.0 | https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/024815 |
+| 7a | バッチレンダリングで描画を高速化 | 2026/01/03 | v7a.0 | https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/121748 |

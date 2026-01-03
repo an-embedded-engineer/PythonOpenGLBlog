@@ -835,7 +835,7 @@ class TestRectangleGeometryVertexData:
 
 ---
 
-**前回**: [第9回「立方体と球体を描く - EBOで頂点を再利用」](https://an-embedded-engineer.hateblo.jp/entry/...)
+**前回**: [第9回「立方体と球体を描く - EBOで頂点を再利用」](https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/024815)
 
 **次回**: 第11回「インスタンシングで同一形状を大量描画」（準備中）
 
