@@ -19,6 +19,7 @@ from src.graphics import (
 )
 from src.graphics.transform import Transform
 from src.utils.logger import logger
+from src.utils import performance_manager
 
 
 class App:
@@ -203,8 +204,10 @@ class App:
         logger.debug("App.run() start")
         try:
             while not self._window.should_close:
+                performance_manager.begin_frame()
                 self._update()
                 self._render()
+                performance_manager.end_frame()
             logger.debug("Main loop ended")
         finally:
             self._shutdown()
@@ -231,6 +234,7 @@ class App:
         self._draw_camera_window()
         self._draw_transform_window()
         self._draw_geometry_window()
+        self._draw_performance_window()
 
     def _draw_settings_window(self) -> None:
         """設定ウィンドウを描画"""
@@ -240,7 +244,7 @@ class App:
         changed, self._clear_color = imgui.color_edit4("Background", self._clear_color)
 
         # FPSの表示
-        imgui.text(f"FPS: {self._gui.get_fps():.1f}")
+        imgui.text(f"FPS: {performance_manager.get_fps():.1f}")
 
         # ボタンの例
         if imgui.button("Reset Color"):
@@ -521,30 +525,123 @@ class App:
 
         imgui.end()
 
+    def _draw_performance_window(self) -> None:
+        """パフォーマンスウィンドウを描画"""
+        imgui.begin("Performance")
+
+        # 前フレームの統計情報を取得
+        stats = performance_manager.get_previous_frame_info()
+        fps_stats = performance_manager.get_fps_stats()
+
+        # FPS表示
+        imgui.text(f"FPS: {stats.fps:.1f}")
+        imgui.text(f"Frame Time: {stats.frame_time_ms:.2f} ms")
+        imgui.text(f"Draw Calls: {performance_manager.get_draw_call_count()}")
+
+        imgui.separator()
+
+        # FPS統計
+        if imgui.tree_node_ex("FPS Stats", imgui.TreeNodeFlags_.default_open):
+            imgui.text(f"Average: {fps_stats['average']:.1f}")
+            imgui.text(f"Max: {fps_stats['max']:.1f}")
+            imgui.text(f"Min: {fps_stats['min']:.1f}")
+            imgui.tree_pop()
+
+        imgui.separator()
+
+        # 処理時間の階層表示
+        if imgui.tree_node_ex("Timing (Hierarchical)", imgui.TreeNodeFlags_.default_open):
+            self._draw_hierarchical_stats(stats.hierarchical_stats, 0)
+            imgui.tree_pop()
+
+        imgui.separator()
+
+        # ログ出力ボタン
+        if imgui.button("Print Stats to Log (Hierarchical)"):
+            performance_manager.print_stats(hierarchical=True)
+
+        if imgui.button("Print Stats to Log (Flat, Sorted)"):
+            performance_manager.print_stats(hierarchical=False, sort_by_time=True)
+
+        if imgui.button("Reset Stats"):
+            performance_manager.reset()
+
+        imgui.end()
+
+    def _draw_hierarchical_stats(self, stats_node: dict, depth: int) -> None:
+        """階層化された統計をimguiで表示"""
+        # 実行順序でソート
+        sorted_nodes = sorted(stats_node.items(),
+                            key=lambda x: x[1].get('execution_order', 0))
+
+        for node_name, node_data in sorted_nodes:
+            timing_ms = node_data['time'] * 1000
+            call_count = node_data['call_count']
+            children = node_data['children']
+
+            is_actual_leaf = len(children) == 0
+
+            if is_actual_leaf:
+                # リーフノード
+                display_text = f"{node_name}: {timing_ms:.2f}ms"
+                if call_count > 1:
+                    display_text += f" (x{call_count})"
+                imgui.text(display_text)
+            else:
+                # 中間ノード（ツリーノードとして表示）
+                total_children_time = self._calculate_total_children_time(children)
+                total_children_ms = total_children_time * 1000
+                
+                # ラベル（表示テキスト）とID部分を完全に分離
+                # ID部分は固定値、ラベル部分は毎フレーム更新される
+                display_label = f"{node_name}: {timing_ms:.2f}ms (children: {total_children_ms:.2f}ms)"
+                node_id = f"{node_name}_{depth}"  # ID部分のみ
+                
+                # tree_node_exを使用してラベルとフラグを指定
+                if imgui.tree_node_ex(node_id, imgui.TreeNodeFlags_.default_open, display_label):
+                    self._draw_hierarchical_stats(children, depth + 1)
+                    imgui.tree_pop()
+
+    def _calculate_total_children_time(self, children: dict) -> float:
+        """子ノードの合計時間を計算"""
+        total_time = 0.0
+        for child_data in children.values():
+            if len(child_data['children']) == 0:
+                total_time += child_data['time']
+            else:
+                total_time += self._calculate_total_children_time(child_data['children'])
+        return total_time
+
     def _render(self) -> None:
         """描画処理"""
-        # 背景色の適用
-        gl.glClearColor(*self._clear_color)
+        with performance_manager.time_operation("Render"):
+            # 背景色の適用
+            gl.glClearColor(*self._clear_color)
 
-        # 深度テストを有効化（3D描画用）
-        gl.glEnable(gl.GL_DEPTH_TEST)
+            # 深度テストを有効化（3D描画用）
+            gl.glEnable(gl.GL_DEPTH_TEST)
 
-        # 画面のクリア
-        gl.glClear(int(gl.GL_COLOR_BUFFER_BIT) | int(gl.GL_DEPTH_BUFFER_BIT))
+            # 画面のクリア
+            gl.glClear(int(gl.GL_COLOR_BUFFER_BIT) | int(gl.GL_DEPTH_BUFFER_BIT))
 
-        # ジオメトリの描画
-        self._draw_geometries()
+            # ジオメトリの描画
+            with performance_manager.time_operation("Draw Geometries"):
+                self._draw_geometries()
 
-        # imguiのレンダリング
-        self._gui.render()
+            # imguiのレンダリング
+            with performance_manager.time_operation("Render GUI"):
+                self._gui.render()
 
-        # バッファの入れ替え
-        self._window.swap_buffers()
+            # バッファの入れ替え
+            self._window.swap_buffers()
 
     def _draw_geometries(self) -> None:
         """ジオメトリを描画する"""
         if not self._shader:
             return
+
+        # ドローコールカウントをリセット
+        draw_call_count = 0
 
         # ワイヤフレームモードの設定
         if self._wireframe_mode:
@@ -573,57 +670,76 @@ class App:
         # 0: Points, 1: Lines, 2: Triangles, 3: All, 4: Rectangle, 5: Cube, 6: Sphere
         if self._geometry_mode == 0 or self._geometry_mode == 3:
             if self._point_geometry:
-                self._point_geometry.draw()
+                with performance_manager.time_operation("Draw Points"):
+                    self._point_geometry.draw()
+                    draw_call_count += 1
 
         if self._geometry_mode == 1 or self._geometry_mode == 3:
             if self._line_geometry:
-                self._line_geometry.draw()
+                with performance_manager.time_operation("Draw Lines"):
+                    self._line_geometry.draw()
+                    draw_call_count += 1
 
         if self._geometry_mode == 2 or self._geometry_mode == 3:
             if self._triangle_geometry:
-                self._triangle_geometry.draw()
+                with performance_manager.time_operation("Draw Triangles"):
+                    self._triangle_geometry.draw()
+                    draw_call_count += 1
 
         # Allモードの場合、複数のRectangle/Cube/Sphereを描画
         if self._geometry_mode == 3:
-            for obj in self._all_mode_objects:
-                # 個別のModel行列を設定
-                self._transform.set_model_identity()
-                self._transform.translate_model(obj['pos'][0], obj['pos'][1], obj['pos'][2])
-                self._transform.scale_model(obj['scale'], obj['scale'], obj['scale'])
-                self._transform.rotate_model_x(self._rotation_x)
-                self._transform.rotate_model_y(self._rotation_y)
-                self._transform.rotate_model_z(self._rotation_z)
-                self._shader.set_mat4("model", self._transform.model)
+            with performance_manager.time_operation("Draw All Objects"):
+                for obj in self._all_mode_objects:
+                    # 個別のModel行列を設定
+                    self._transform.set_model_identity()
+                    self._transform.translate_model(obj['pos'][0], obj['pos'][1], obj['pos'][2])
+                    self._transform.scale_model(obj['scale'], obj['scale'], obj['scale'])
+                    self._transform.rotate_model_x(self._rotation_x)
+                    self._transform.rotate_model_y(self._rotation_y)
+                    self._transform.rotate_model_z(self._rotation_z)
+                    self._shader.set_mat4("model", self._transform.model)
 
-                # オブジェクトタイプに応じて描画
-                if obj['type'] == 'rectangle' and self._rectangle_geometry:
-                    # 一時的に色を変更
-                    original_color = self._rectangle_geometry._color
-                    self._rectangle_geometry.set_color(*obj['color'])
-                    self._rectangle_geometry.draw()
-                    self._rectangle_geometry.set_color(*original_color)
-                elif obj['type'] == 'cube' and self._cube_geometry:
-                    original_color = self._cube_geometry._color
-                    self._cube_geometry.set_color(*obj['color'])
-                    self._cube_geometry.draw()
-                    self._cube_geometry.set_color(*original_color)
-                elif obj['type'] == 'sphere' and self._sphere_geometry:
-                    original_color = self._sphere_geometry._color
-                    self._sphere_geometry.set_color(*obj['color'])
-                    self._sphere_geometry.draw()
-                    self._sphere_geometry.set_color(*original_color)
+                    # オブジェクトタイプに応じて描画
+                    if obj['type'] == 'rectangle' and self._rectangle_geometry:
+                        # 一時的に色を変更
+                        original_color = self._rectangle_geometry._color
+                        self._rectangle_geometry.set_color(*obj['color'])
+                        self._rectangle_geometry.draw()
+                        self._rectangle_geometry.set_color(*original_color)
+                        draw_call_count += 1
+                    elif obj['type'] == 'cube' and self._cube_geometry:
+                        original_color = self._cube_geometry._color
+                        self._cube_geometry.set_color(*obj['color'])
+                        self._cube_geometry.draw()
+                        self._cube_geometry.set_color(*original_color)
+                        draw_call_count += 1
+                    elif obj['type'] == 'sphere' and self._sphere_geometry:
+                        original_color = self._sphere_geometry._color
+                        self._sphere_geometry.set_color(*obj['color'])
+                        self._sphere_geometry.draw()
+                        self._sphere_geometry.set_color(*original_color)
+                        draw_call_count += 1
 
         if self._geometry_mode == 4:
             if self._rectangle_geometry:
-                self._rectangle_geometry.draw()
+                with performance_manager.time_operation("Draw Rectangle"):
+                    self._rectangle_geometry.draw()
+                    draw_call_count += 1
 
         if self._geometry_mode == 5:
             if self._cube_geometry:
-                self._cube_geometry.draw()
+                with performance_manager.time_operation("Draw Cube"):
+                    self._cube_geometry.draw()
+                    draw_call_count += 1
 
         if self._geometry_mode == 6:
             if self._sphere_geometry:
-                self._sphere_geometry.draw()
+                with performance_manager.time_operation("Draw Sphere"):
+                    self._sphere_geometry.draw()
+                    draw_call_count += 1
+
+        # ドローコール数を記録
+        performance_manager.set_draw_call_count(draw_call_count)
 
         # ワイヤフレームモードをリセット
         if self._wireframe_mode:
