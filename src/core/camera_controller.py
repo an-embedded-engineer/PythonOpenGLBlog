@@ -2,9 +2,8 @@
 カメラコントローラーモジュール
 """
 import numpy as np
-from typing import Union
 
-from src.core.mouse_controller import MouseController, MouseButton
+from src.core.mouse_controller import MouseController
 from src.graphics.camera import Camera2D, Camera3D, UpAxis
 from src.utils.logger import logger
 

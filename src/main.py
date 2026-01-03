@@ -5,11 +5,11 @@ PythonOpenGL - Phase 4a: シェーダー基礎（頂点編）
 import logging
 
 # imguiとGLFWのimport順による警告を防ぐため、ここでimportする
-from imgui_bundle import imgui
-import glfw
+from imgui_bundle import imgui # noqa: F401
+import glfw # noqa: F401
 
 from src.core import App
-from src.utils import setup_logger, FORCE, TIME, TRACE
+from src.utils import setup_logger
 
 
 # ログ設定（DEBUG, INFO, WARNING, ERROR から選択）

@@ -4,7 +4,7 @@
 FPS計測と処理時間測定を行う
 """
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, List
 from dataclasses import dataclass, field
 
 from src.utils.logger import logger
