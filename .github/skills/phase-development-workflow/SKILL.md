@@ -123,11 +123,74 @@ git push origin main
 **Task**: Create tag and merge to main
 
 ```bash
-git tag v{number}.0              # e.g., v5a.0
 git checkout main
-git merge phase{number}/{keyword}
+git merge phase{number}/{keyword} --no-ff -m "Merge branch 'phase{number}/{keyword}' - {summary}
+
+{detailed description}"
+
+git tag -a v{number}.0 -m "Phase {number}: {title}
+
+{release notes}"
+
 git push origin main
 git push origin v{number}.0
+```
+
+**Merge Policy**: Always use `--no-ff` (no fast-forward) to preserve branch history and make phase boundaries visible in the revision graph.
+
+**Merge Message Template**:
+```
+Merge branch 'phase{number}/{keyword}' - {one-line summary}
+
+Phase {number}: {Full Title}
+
+## Features
+- Feature 1
+- Feature 2
+
+## Performance Results (if applicable)
+- Metric 1: before → after (change%)
+
+## Testing
+- {number} unit tests passing
+
+## Documentation
+- Blog URL: {blog article URL}
+
+Closes #{phase number}
+```
+
+**Tag Message Template**:
+```
+Phase {number}: {Title}
+
+Release Date: YYYY/MM/DD
+Blog Article: {blog article URL}
+
+## Summary
+{1-2 sentence summary}
+
+## Key Features
+- Feature 1
+- Feature 2
+
+## Performance Results (if applicable)
+- Metric 1: value
+- Metric 2: value
+
+## Testing
+- {number} tests passing
+
+## Files Added/Modified
+- {list of main files}
+
+## Dependencies
+{New dependencies or "No new dependencies added"}
+
+## Verified Environment
+- OS
+- Python version
+- OpenGL version
 ```
 
 ### Step 12: Phase Completion
