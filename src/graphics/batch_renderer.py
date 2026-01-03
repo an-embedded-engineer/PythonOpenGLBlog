@@ -91,6 +91,7 @@ class BatchRenderer:
         """バッチをクリア"""
         self._batches.clear()
         self._is_dirty = True
+        self._use_indices = False  # インデックス使用フラグをリセット
         self._total_vertices = 0
         self._total_indices = 0
 

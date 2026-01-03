@@ -98,7 +98,10 @@ class App:
 
         # バッチレンダリング
         self._use_batch_rendering = False
-        self._batch_renderer_triangles: BatchRenderer | None = None
+        self._batch_renderer_points: BatchRenderer | None = None
+        self._batch_renderer_lines: BatchRenderer | None = None
+        self._batch_renderer_triangles_geometry: BatchRenderer | None = None  # 三角形ジオメトリ用（インデックスなし）
+        self._batch_renderer_triangles: BatchRenderer | None = None  # 矩形・立方体・球体用（インデックスあり）
 
         logger.debug("App.__init__ end")
 
@@ -774,10 +777,19 @@ class App:
             return
 
         # バッチレンダラーを初期化（初回のみ）
+        if self._batch_renderer_points is None:
+            self._batch_renderer_points = BatchRenderer(PrimitiveType.POINTS)
+        if self._batch_renderer_lines is None:
+            self._batch_renderer_lines = BatchRenderer(PrimitiveType.LINES)
+        if self._batch_renderer_triangles_geometry is None:
+            self._batch_renderer_triangles_geometry = BatchRenderer(PrimitiveType.TRIANGLES)
         if self._batch_renderer_triangles is None:
             self._batch_renderer_triangles = BatchRenderer(PrimitiveType.TRIANGLES)
 
         # バッチをクリア
+        self._batch_renderer_points.clear()
+        self._batch_renderer_lines.clear()
+        self._batch_renderer_triangles_geometry.clear()
         self._batch_renderer_triangles.clear()
 
         # ワイヤフレームモードの設定
@@ -796,8 +808,29 @@ class App:
         self._shader.set_mat4("view", camera.view_matrix)
         self._shader.set_mat4("projection", camera.projection_matrix)
 
-        # Allモードの全オブジェクトをバッチに追加
+        # 回転用のModel行列を計算
+        self._transform.set_model_identity()
+        self._transform.rotate_model_x(self._rotation_x)
+        self._transform.rotate_model_y(self._rotation_y)
+        self._transform.rotate_model_z(self._rotation_z)
+        rotation_matrix = self._transform.model.copy()
+
+        # バッチ構築
         with performance_manager.time_operation("Build Batch"):
+            # 点・線・三角形をバッチに追加
+            if self._point_geometry:
+                vertices, indices = self._point_geometry.get_vertex_data()
+                self._batch_renderer_points.add_geometry(vertices, indices, rotation_matrix)
+
+            if self._line_geometry:
+                vertices, indices = self._line_geometry.get_vertex_data()
+                self._batch_renderer_lines.add_geometry(vertices, indices, rotation_matrix)
+
+            if self._triangle_geometry:
+                vertices, indices = self._triangle_geometry.get_vertex_data()
+                self._batch_renderer_triangles_geometry.add_geometry(vertices, indices, rotation_matrix)
+
+            # Allモードの全オブジェクト（矩形・立方体・球体）をバッチに追加
             for obj in self._all_mode_objects:
                 # 個別のModel行列を計算
                 self._transform.set_model_identity()
@@ -831,14 +864,30 @@ class App:
                     # バッチに追加
                     self._batch_renderer_triangles.add_geometry(vertices, indices, model_matrix)
 
-        # バッチをビルド＆描画（1回のドローコール）
+        # バッチをビルド＆描画（最大4回のドローコール）
+        draw_call_count = 0
         with performance_manager.time_operation("Draw Batch"):
             # Model行列は単位行列に設定（各頂点は既に変換済み）
             self._shader.set_mat4("model", np.eye(4, dtype=np.float32))
-            self._batch_renderer_triangles.flush()
+            
+            if self._batch_renderer_points.batch_count > 0:
+                self._batch_renderer_points.flush()
+                draw_call_count += 1
+            
+            if self._batch_renderer_lines.batch_count > 0:
+                self._batch_renderer_lines.flush()
+                draw_call_count += 1
+            
+            if self._batch_renderer_triangles_geometry.batch_count > 0:
+                self._batch_renderer_triangles_geometry.flush()
+                draw_call_count += 1
+            
+            if self._batch_renderer_triangles.batch_count > 0:
+                self._batch_renderer_triangles.flush()
+                draw_call_count += 1
 
-        # ドローコール数を記録（バッチレンダリングは1回）
-        performance_manager.set_draw_call_count(1)
+        # ドローコール数を記録
+        performance_manager.set_draw_call_count(draw_call_count)
 
         # ワイヤフレームモードをリセット
         if self._wireframe_mode:
@@ -847,6 +896,12 @@ class App:
     def _shutdown(self) -> None:
         """終了処理"""
         # バッチレンダラーの解放
+        if self._batch_renderer_points:
+            self._batch_renderer_points.cleanup()
+        if self._batch_renderer_lines:
+            self._batch_renderer_lines.cleanup()
+        if self._batch_renderer_triangles_geometry:
+            self._batch_renderer_triangles_geometry.cleanup()
         if self._batch_renderer_triangles:
             self._batch_renderer_triangles.cleanup()
 
