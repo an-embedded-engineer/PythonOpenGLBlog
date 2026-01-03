@@ -13,11 +13,12 @@ from src.core.gui import GUI
 from src.core.mouse_controller import MouseController
 from src.core.camera_controller import CameraController
 from src.graphics import (
-    Shader, Camera2D, Camera3D, CameraMode, UpAxis,
+    Shader, Camera2D, Camera3D, UpAxis,
     PointGeometry, LineGeometry, TriangleGeometry,
     RectangleGeometry, CubeGeometry, SphereGeometry,
 )
 from src.graphics.transform import Transform
+from src.graphics.batch_renderer import BatchRenderer, PrimitiveType
 from src.utils.logger import logger
 from src.utils import performance_manager
 
@@ -94,6 +95,10 @@ class App:
         # Allモード用の複数オブジェクト（位置とスケール）
         self._all_mode_objects: list[dict] = []
         self._generate_all_mode_objects()
+
+        # バッチレンダリング
+        self._use_batch_rendering = False
+        self._batch_renderer_triangles: BatchRenderer | None = None
 
         logger.debug("App.__init__ end")
 
@@ -246,6 +251,13 @@ class App:
         # FPSの表示
         imgui.text(f"FPS: {performance_manager.get_fps():.1f}")
 
+        imgui.separator()
+
+        # バッチレンダリング設定
+        changed, self._use_batch_rendering = imgui.checkbox("Use Batch Rendering (All Mode)", self._use_batch_rendering)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip("Enable batch rendering to reduce draw calls\n(Only works in All mode)")
+
         # ボタンの例
         if imgui.button("Reset Color"):
             self._clear_color = [0.2, 0.2, 0.2, 1.0]
@@ -366,7 +378,7 @@ class App:
 
     def _draw_geometry_window(self) -> None:
         """形状ウィンドウを描画"""
-        imgui.begin("Geometry")
+        imgui.begin(name="Geometry")
 
         # 表示モードの選択
         mode_names = ["Points", "Lines", "Triangles", "All", "Rectangle", "Cube", "Sphere"]
@@ -640,6 +652,17 @@ class App:
         if not self._shader:
             return
 
+        # バッチレンダリングを使用するかどうか
+        if self._use_batch_rendering and self._geometry_mode == 3:
+            self._draw_with_batching()
+        else:
+            self._draw_without_batching()
+
+    def _draw_without_batching(self) -> None:
+        """バッチレンダリングなしで描画（従来の方法）"""
+        if not self._shader:
+            return
+
         # ドローコールカウントをリセット
         draw_call_count = 0
 
@@ -745,8 +768,88 @@ class App:
         if self._wireframe_mode:
             gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
+    def _draw_with_batching(self) -> None:
+        """バッチレンダリングを使用して描画（Allモード専用）"""
+        if not self._shader:
+            return
+
+        # バッチレンダラーを初期化（初回のみ）
+        if self._batch_renderer_triangles is None:
+            self._batch_renderer_triangles = BatchRenderer(PrimitiveType.TRIANGLES)
+
+        # バッチをクリア
+        self._batch_renderer_triangles.clear()
+
+        # ワイヤフレームモードの設定
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
+        else:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
+        # シェーダーを使用
+        self._shader.use()
+
+        # 現在のカメラを取得
+        camera = self._camera_3d if self._use_3d_camera else self._camera_2d
+
+        # View/Projection行列をシェーダーに設定
+        self._shader.set_mat4("view", camera.view_matrix)
+        self._shader.set_mat4("projection", camera.projection_matrix)
+
+        # Allモードの全オブジェクトをバッチに追加
+        with performance_manager.time_operation("Build Batch"):
+            for obj in self._all_mode_objects:
+                # 個別のModel行列を計算
+                self._transform.set_model_identity()
+                self._transform.translate_model(obj['pos'][0], obj['pos'][1], obj['pos'][2])
+                self._transform.scale_model(obj['scale'], obj['scale'], obj['scale'])
+                self._transform.rotate_model_x(self._rotation_x)
+                self._transform.rotate_model_y(self._rotation_y)
+                self._transform.rotate_model_z(self._rotation_z)
+                model_matrix = self._transform.model.copy()
+
+                # オブジェクトタイプに応じて頂点データを取得してバッチに追加
+                geometry = None
+                if obj['type'] == 'rectangle' and self._rectangle_geometry:
+                    geometry = self._rectangle_geometry
+                elif obj['type'] == 'cube' and self._cube_geometry:
+                    geometry = self._cube_geometry
+                elif obj['type'] == 'sphere' and self._sphere_geometry:
+                    geometry = self._sphere_geometry
+
+                if geometry:
+                    # 一時的に色を設定
+                    original_color = geometry._color
+                    geometry.set_color(*obj['color'])
+
+                    # 頂点データを取得
+                    vertices, indices = geometry.get_vertex_data()
+
+                    # 色を戻す
+                    geometry.set_color(*original_color)
+
+                    # バッチに追加
+                    self._batch_renderer_triangles.add_geometry(vertices, indices, model_matrix)
+
+        # バッチをビルド＆描画（1回のドローコール）
+        with performance_manager.time_operation("Draw Batch"):
+            # Model行列は単位行列に設定（各頂点は既に変換済み）
+            self._shader.set_mat4("model", np.eye(4, dtype=np.float32))
+            self._batch_renderer_triangles.flush()
+
+        # ドローコール数を記録（バッチレンダリングは1回）
+        performance_manager.set_draw_call_count(1)
+
+        # ワイヤフレームモードをリセット
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
     def _shutdown(self) -> None:
         """終了処理"""
+        # バッチレンダラーの解放
+        if self._batch_renderer_triangles:
+            self._batch_renderer_triangles.cleanup()
+
         # ジオメトリリソースの解放
         if self._point_geometry:
             self._point_geometry.cleanup()
