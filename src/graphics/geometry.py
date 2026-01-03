@@ -254,6 +254,18 @@ class GeometryBase(ABC):
         else:
             self._buffer_manager.draw_arrays(self._vao, self.primitive_type.value, self._vertex_count)
 
+    @abstractmethod
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """
+        バッチレンダリング用の頂点データを取得
+
+        Returns:
+            (vertices, indices): 頂点データとインデックスデータ（インデックス不使用時はNone）
+            vertices: Nx6 array (x,y,z,r,g,b)
+            indices: インデックス配列（Optional）
+        """
+        pass
+
     def cleanup(self) -> None:
         """リソースを解放する"""
         self._delete_buffers()
@@ -336,6 +348,14 @@ class PointGeometry(GeometryBase):
 
         vertices = np.array(self._points, dtype=np.float32).flatten()
         self._create_buffers(vertices)
+
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        if not self._points:
+            return np.array([], dtype=np.float32).reshape(0, 6), None
+
+        vertices = np.array(self._points, dtype=np.float32)
+        return vertices, None
 
     def draw(self) -> None:
         """点を描画する"""
@@ -461,7 +481,19 @@ class LineGeometry(GeometryBase):
 
         vertices = np.array(vertices, dtype=np.float32)
         self._create_buffers(vertices)
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        if not self._lines:
+            return np.array([], dtype=np.float32).reshape(0, 6), None
 
+        # 線を頂点配列に変換
+        vertices = []
+        for v1, v2 in self._lines:
+            vertices.extend(v1)
+            vertices.extend(v2)
+
+        vertices = np.array(vertices, dtype=np.float32).reshape(-1, 6)
+        return vertices, None
     def draw(self) -> None:
         """線分を描画する"""
         if not self._is_initialized:
@@ -592,6 +624,21 @@ class TriangleGeometry(GeometryBase):
         vertices = np.array(vertices, dtype=np.float32)
         self._create_buffers(vertices)
 
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        if not self._triangles:
+            return np.array([], dtype=np.float32).reshape(0, 6), None
+
+        # 三角形を頂点配列に変換
+        vertices = []
+        for v1, v2, v3 in self._triangles:
+            vertices.extend(v1)
+            vertices.extend(v2)
+            vertices.extend(v3)
+
+        vertices = np.array(vertices, dtype=np.float32).reshape(-1, 6)
+        return vertices, None
+
 
 class RectangleGeometry(GeometryBase):
     """
@@ -689,6 +736,29 @@ class RectangleGeometry(GeometryBase):
         ], dtype=np.uint32)
 
         self._create_indexed_buffers(vertices, indices)
+
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        w = self._width / 2.0
+        h = self._height / 2.0
+        r, g, b = self._color
+
+        # 頂点データ（4頂点）
+        vertices = np.array([
+            # 位置           色
+            -w, -h, 0.0,  r, g, b,  # 左下
+             w, -h, 0.0,  r, g, b,  # 右下
+             w,  h, 0.0,  r, g, b,  # 右上
+            -w,  h, 0.0,  r, g, b,  # 左上
+        ], dtype=np.float32).reshape(4, 6)
+
+        # インデックスデータ
+        indices = np.array([
+            0, 1, 2,
+            2, 3, 0,
+        ], dtype=np.uint32)
+
+        return vertices, indices
 
 
 class CubeGeometry(GeometryBase):
@@ -805,6 +875,44 @@ class CubeGeometry(GeometryBase):
         ], dtype=np.uint32)
 
         self._create_indexed_buffers(vertices, indices)
+
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        s = self._size / 2.0
+        r, g, b = self._color
+
+        # 立方体の8頂点
+        vertices = np.array([
+            # 位置           色
+            # 前面（Z+）
+            -s, -s,  s,  r, g, b,  # 0: 左下前
+             s, -s,  s,  r, g, b,  # 1: 右下前
+             s,  s,  s,  r, g, b,  # 2: 右上前
+            -s,  s,  s,  r, g, b,  # 3: 左上前
+            # 背面（Z-）
+            -s, -s, -s,  r, g, b,  # 4: 左下後
+             s, -s, -s,  r, g, b,  # 5: 右下後
+             s,  s, -s,  r, g, b,  # 6: 右上後
+            -s,  s, -s,  r, g, b,  # 7: 左上後
+        ], dtype=np.float32).reshape(8, 6)
+
+        # インデックスデータ
+        indices = np.array([
+            # 前面（Z+）
+            0, 1, 2,  2, 3, 0,
+            # 背面（Z-）
+            5, 4, 7,  7, 6, 5,
+            # 左面（X-）
+            4, 0, 3,  3, 7, 4,
+            # 右面（X+）
+            1, 5, 6,  6, 2, 1,
+            # 上面（Y+）
+            3, 2, 6,  6, 7, 3,
+            # 下面（Y-）
+            4, 5, 1,  1, 0, 4,
+        ], dtype=np.uint32)
+
+        return vertices, indices
 
 
 class SphereGeometry(GeometryBase):
@@ -939,3 +1047,40 @@ class SphereGeometry(GeometryBase):
         indices = np.array(indices, dtype=np.uint32)
 
         self._create_indexed_buffers(vertices, indices)
+
+    def get_vertex_data(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """バッチレンダリング用の頂点データを取得"""
+        r, g, b = self._color
+        vertices = []
+        indices = []
+
+        # 頂点生成
+        for ring in range(self._rings + 1):
+            theta = np.pi * ring / self._rings
+            sin_theta = np.sin(theta)
+            cos_theta = np.cos(theta)
+
+            for segment in range(self._segments + 1):
+                phi = 2.0 * np.pi * segment / self._segments
+                sin_phi = np.sin(phi)
+                cos_phi = np.cos(phi)
+
+                x = self._radius * sin_theta * cos_phi
+                y = self._radius * cos_theta
+                z = self._radius * sin_theta * sin_phi
+
+                vertices.extend([x, y, z, r, g, b])
+
+        # インデックス生成
+        for ring in range(self._rings):
+            for segment in range(self._segments):
+                first = ring * (self._segments + 1) + segment
+                second = first + self._segments + 1
+
+                indices.extend([first, second, first + 1])
+                indices.extend([second, second + 1, first + 1])
+
+        vertices = np.array(vertices, dtype=np.float32).reshape(-1, 6)
+        indices = np.array(indices, dtype=np.uint32)
+
+        return vertices, indices

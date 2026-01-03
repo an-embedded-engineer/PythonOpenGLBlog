@@ -89,6 +89,7 @@ AIと人間が協力してコードと記事を作り上げていく様子も、
 | 第7回 | [マウスでカメラ操作](https://an-embedded-engineer.hateblo.jp/entry/2025/12/01/221459) | 2025/12/01 |
 | 第8回 | [点・線・三角形を描く](https://an-embedded-engineer.hateblo.jp/entry/2025/12/06/015110) | 2025/12/06 |
 | 第9回 | [立方体と球体を描く - EBOで頂点を再利用](https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/024815) | 2026/01/03 |
+| 第10回 | [バッチレンダリングで描画を高速化](https://an-embedded-engineer.hateblo.jp/entry/2026/01/03/121748) | 2026/01/03 |
 
 ### サンプルコードの入手方法
 
