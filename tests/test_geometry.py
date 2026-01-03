@@ -252,3 +252,180 @@ class TestSphereGeometry:
         mock_manager = MockBufferManager()
         geom = SphereGeometry(rings=1, buffer_manager=mock_manager, lazy_init=True)
         assert geom._rings >= 2
+
+
+# === get_vertex_data() のテスト ===
+
+class TestPointGeometryVertexData:
+    """PointGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data_empty(self) -> None:
+        """空のジオメトリ"""
+        mock_manager = MockBufferManager()
+        geom = PointGeometry(buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (0, 6)
+        assert indices is None
+    
+    def test_get_vertex_data_single_point(self) -> None:
+        """単一の点"""
+        mock_manager = MockBufferManager()
+        geom = PointGeometry(buffer_manager=mock_manager)
+        geom.add_point(1.0, 2.0, 3.0, 0.5, 0.6, 0.7)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (1, 6)
+        assert np.allclose(vertices[0], [1.0, 2.0, 3.0, 0.5, 0.6, 0.7])
+        assert indices is None
+    
+    def test_get_vertex_data_multiple_points(self) -> None:
+        """複数の点"""
+        mock_manager = MockBufferManager()
+        geom = PointGeometry(buffer_manager=mock_manager)
+        geom.add_point(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        geom.add_point(0.0, 1.0, 0.0, 0.0, 1.0, 0.0)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (2, 6)
+        assert indices is None
+
+
+class TestLineGeometryVertexData:
+    """LineGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data_empty(self) -> None:
+        """空のジオメトリ"""
+        mock_manager = MockBufferManager()
+        geom = LineGeometry(buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (0, 6)
+        assert indices is None
+    
+    def test_get_vertex_data_single_line(self) -> None:
+        """単一の線"""
+        mock_manager = MockBufferManager()
+        geom = LineGeometry(buffer_manager=mock_manager)
+        geom.add_line(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (2, 6)  # 2頂点
+        assert indices is None
+
+
+class TestTriangleGeometryVertexData:
+    """TriangleGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data_empty(self) -> None:
+        """空のジオメトリ"""
+        mock_manager = MockBufferManager()
+        geom = TriangleGeometry(buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (0, 6)
+        assert indices is None
+    
+    def test_get_vertex_data_single_triangle(self) -> None:
+        """単一の三角形"""
+        mock_manager = MockBufferManager()
+        geom = TriangleGeometry(buffer_manager=mock_manager)
+        geom.add_triangle(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (3, 6)  # 3頂点
+        assert indices is None
+
+
+class TestRectangleGeometryVertexData:
+    """RectangleGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data(self) -> None:
+        """矩形の頂点データ取得"""
+        mock_manager = MockBufferManager()
+        geom = RectangleGeometry(width=2.0, height=1.0, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (4, 6)  # 4頂点
+        assert indices is not None
+        assert indices.shape == (6,)  # 2三角形 = 6インデックス
+        np.testing.assert_array_equal(indices, [0, 1, 2, 2, 3, 0])
+    
+    def test_get_vertex_data_with_color(self) -> None:
+        """色付き矩形"""
+        mock_manager = MockBufferManager()
+        geom = RectangleGeometry(r=0.5, g=0.6, b=0.7, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        # 全頂点の色が同じ
+        for i in range(4):
+            assert np.allclose(vertices[i, 3:], [0.5, 0.6, 0.7])
+
+
+class TestCubeGeometryVertexData:
+    """CubeGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data(self) -> None:
+        """立方体の頂点データ取得"""
+        mock_manager = MockBufferManager()
+        geom = CubeGeometry(size=2.0, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        assert vertices.shape == (8, 6)  # 8頂点
+        assert indices is not None
+        assert indices.shape == (36,)  # 6面 × 2三角形 × 3インデックス
+    
+    def test_get_vertex_data_vertices_positions(self) -> None:
+        """立方体の頂点位置確認"""
+        mock_manager = MockBufferManager()
+        geom = CubeGeometry(size=2.0, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        # size=2.0なので、半径1.0の範囲に頂点がある
+        positions = vertices[:, :3]
+        assert np.all(positions >= -1.0)
+        assert np.all(positions <= 1.0)
+
+
+class TestSphereGeometryVertexData:
+    """SphereGeometryのget_vertex_data()テスト"""
+    
+    def test_get_vertex_data(self) -> None:
+        """球体の頂点データ取得"""
+        mock_manager = MockBufferManager()
+        geom = SphereGeometry(radius=1.0, segments=8, rings=4, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        # (rings+1) * (segments+1) 頂点
+        expected_vertices = (4 + 1) * (8 + 1)
+        assert vertices.shape == (expected_vertices, 6)
+        
+        # rings * segments * 2三角形 * 3インデックス
+        expected_indices = 4 * 8 * 2 * 3
+        assert indices is not None
+        assert indices.shape == (expected_indices,)
+    
+    def test_get_vertex_data_radius(self) -> None:
+        """球体の半径確認"""
+        mock_manager = MockBufferManager()
+        radius = 2.5
+        geom = SphereGeometry(radius=radius, segments=16, rings=8, buffer_manager=mock_manager)
+        
+        vertices, indices = geom.get_vertex_data()
+        
+        # 全頂点が半径以内にある
+        positions = vertices[:, :3]
+        distances = np.sqrt(np.sum(positions**2, axis=1))
+        assert np.all(distances <= radius + 0.01)  # 浮動小数点誤差を考慮
