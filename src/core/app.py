@@ -869,19 +869,19 @@ class App:
         with performance_manager.time_operation("Draw Batch"):
             # Model行列は単位行列に設定（各頂点は既に変換済み）
             self._shader.set_mat4("model", np.eye(4, dtype=np.float32))
-            
+
             if self._batch_renderer_points.batch_count > 0:
                 self._batch_renderer_points.flush()
                 draw_call_count += 1
-            
+
             if self._batch_renderer_lines.batch_count > 0:
                 self._batch_renderer_lines.flush()
                 draw_call_count += 1
-            
+
             if self._batch_renderer_triangles_geometry.batch_count > 0:
                 self._batch_renderer_triangles_geometry.flush()
                 draw_call_count += 1
-            
+
             if self._batch_renderer_triangles.batch_count > 0:
                 self._batch_renderer_triangles.flush()
                 draw_call_count += 1
