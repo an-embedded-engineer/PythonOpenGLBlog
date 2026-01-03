@@ -591,12 +591,12 @@ class App:
                 # 中間ノード（ツリーノードとして表示）
                 total_children_time = self._calculate_total_children_time(children)
                 total_children_ms = total_children_time * 1000
-                
+
                 # ラベル（表示テキスト）とID部分を完全に分離
                 # ID部分は固定値、ラベル部分は毎フレーム更新される
                 display_label = f"{node_name}: {timing_ms:.2f}ms (children: {total_children_ms:.2f}ms)"
                 node_id = f"{node_name}_{depth}"  # ID部分のみ
-                
+
                 # tree_node_exを使用してラベルとフラグを指定
                 if imgui.tree_node_ex(node_id, imgui.TreeNodeFlags_.default_open, display_label):
                     self._draw_hierarchical_stats(children, depth + 1)

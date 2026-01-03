@@ -23,38 +23,38 @@ class PerformanceStats:
 class PerformanceManager:
     """
     パフォーマンス管理クラス
-    
+
     FPS計測と処理時間測定を提供する
     """
 
     def __init__(self, target_fps: float = 60.0) -> None:
         """
         初期化
-        
+
         Args:
             target_fps: 目標FPS（表示用）
         """
         self.target_fps = target_fps
-        
+
         # FPS計測
         self._last_frame_time = time.time()
         self._frame_count = 0
         self._fps_accumulator = 0.0
         self._current_fps = 0.0
-        
+
         # FPS統計（平均/最大/最小）
         self._fps_history: List[float] = []
         self._fps_history_max_size = 60  # 1秒分の履歴
-        
+
         # 処理時間計測
         self._timing_stats: Dict[str, float] = {}
         self._hierarchical_stats: Dict[str, Dict] = {}
         self._operation_stack: List[str] = []
         self._execution_order: List[str] = []
-        
+
         # 前フレーム情報（imgui表示用）
         self._previous_frame_stats = PerformanceStats()
-        
+
         # ドローコール数（外部から設定）
         self._draw_call_count = 0
 
@@ -62,28 +62,28 @@ class PerformanceManager:
         """フレーム開始時の処理"""
         current_time = time.time()
         frame_time = current_time - self._last_frame_time
-        
+
         # FPS計算
         self._frame_count += 1
         self._fps_accumulator += frame_time
-        
+
         # 10フレームごとにFPS更新
         if self._frame_count >= 10:
             if self._fps_accumulator > 0.0:
                 self._current_fps = self._frame_count / self._fps_accumulator
-                
+
                 # FPS履歴に追加
                 self._fps_history.append(self._current_fps)
                 if len(self._fps_history) > self._fps_history_max_size:
                     self._fps_history.pop(0)
             else:
                 self._current_fps = self.target_fps
-            
+
             self._frame_count = 0
             self._fps_accumulator = 0.0
-        
+
         self._last_frame_time = current_time
-        
+
         # 統計をクリア
         self._hierarchical_stats.clear()
         self._execution_order.clear()
@@ -103,13 +103,13 @@ class PerformanceManager:
     def time_operation(self, operation_name: str):
         """
         操作の実行時間を測定するコンテキストマネージャ
-        
+
         Args:
             operation_name: 操作名
-            
+
         Returns:
             OperationTimer
-            
+
         Example:
             with performance_manager.time_operation("Draw Cubes"):
                 draw_cubes()
@@ -124,23 +124,23 @@ class PerformanceManager:
         """階層化された操作終了（内部用）"""
         # 階層化された統計を更新
         self._update_hierarchical_stats(operation_name, elapsed_time)
-        
+
         # スタックから操作を取り除く
         if self._operation_stack and self._operation_stack[-1] == operation_name:
             self._operation_stack.pop()
-        
+
         # フラットな統計も保持
         self._timing_stats[operation_name] = elapsed_time
 
     def _update_hierarchical_stats(self, operation_name: str, elapsed_time: float) -> None:
         """階層化された統計を更新"""
         current_path = self._operation_stack.copy()
-        
+
         # 実行順序を記録
         path_key = " -> ".join(current_path)
         if path_key not in self._execution_order:
             self._execution_order.append(path_key)
-        
+
         # 階層データ構造を更新
         current_node = self._hierarchical_stats
         for i, path_part in enumerate(current_path):
@@ -152,7 +152,7 @@ class PerformanceManager:
                     'is_leaf': i == len(current_path) - 1,
                     'execution_order': len(self._execution_order) - 1
                 }
-            
+
             if i == len(current_path) - 1:
                 # リーフノード：時間を更新
                 current_node[path_part]['time'] = elapsed_time
@@ -173,7 +173,7 @@ class PerformanceManager:
                 'is_leaf': node['is_leaf'],
                 'execution_order': node.get('execution_order', 0)
             }
-        
+
         return {k: copy_node(v) for k, v in self._hierarchical_stats.items()}
 
     def get_fps(self) -> float:
@@ -187,13 +187,13 @@ class PerformanceManager:
     def get_fps_stats(self) -> Dict[str, float]:
         """
         FPS統計を取得（平均/最大/最小）
-        
+
         Returns:
             {'average': float, 'max': float, 'min': float}
         """
         if not self._fps_history:
             return {'average': 0.0, 'max': 0.0, 'min': 0.0}
-        
+
         return {
             'average': sum(self._fps_history) / len(self._fps_history),
             'max': max(self._fps_history),
@@ -215,56 +215,56 @@ class PerformanceManager:
     def print_stats(self, hierarchical: bool = True, sort_by_time: bool = False) -> None:
         """
         パフォーマンス統計をログ出力
-        
+
         Args:
             hierarchical: 階層表示（True）またはフラット表示（False）
             sort_by_time: 時間順でソート（フラット表示のみ有効）
         """
         # 前フレームの統計を使用
         stats = self._previous_frame_stats
-        
+
         logger.info("\n=== Performance Stats ===")
         logger.info(f"FPS: {stats.fps:.1f}")
         logger.info(f"Frame Time: {stats.frame_time_ms:.2f}ms")
         logger.info(f"Draw Calls: {self._draw_call_count}")
-        
+
         # FPS統計
         fps_stats = self.get_fps_stats()
         logger.info(f"FPS Stats - Avg: {fps_stats['average']:.1f}, "
                    f"Max: {fps_stats['max']:.1f}, Min: {fps_stats['min']:.1f}")
-        
+
         if hierarchical and stats.hierarchical_stats:
             logger.info("\nHierarchical Operation Timings:")
             self._print_hierarchical_stats(stats.hierarchical_stats, 0)
         else:
             logger.info("\nFlat Operation Timings:")
             if sort_by_time:
-                sorted_stats = sorted(stats.timing_stats.items(), 
+                sorted_stats = sorted(stats.timing_stats.items(),
                                     key=lambda x: x[1], reverse=True)
             else:
                 sorted_stats = stats.timing_stats.items()
-            
+
             for operation, time_s in sorted_stats:
                 percentage = (time_s / stats.frame_time_ms * 1000 * 100) if stats.frame_time_ms > 0 else 0
                 logger.info(f"  {operation}: {time_s*1000:.2f}ms ({percentage:.1f}%)")
-        
+
         logger.info("=" * 25)
 
     def _print_hierarchical_stats(self, stats_node: Dict, depth: int) -> None:
         """階層化された統計をログ出力"""
         indent = "  " * (depth + 1)
-        
+
         # 実行順序でソート
         sorted_nodes = sorted(stats_node.items(),
                             key=lambda x: x[1].get('execution_order', 0))
-        
+
         for node_name, node_data in sorted_nodes:
             timing_ms = node_data['time'] * 1000
             call_count = node_data['call_count']
             children = node_data['children']
-            
+
             is_actual_leaf = len(children) == 0
-            
+
             if is_actual_leaf:
                 # リーフノード
                 display_text = f"{node_name}: {timing_ms:.2f}ms"
@@ -310,7 +310,7 @@ class OperationTimer:
     def __init__(self, perf_manager: PerformanceManager, operation_name: str):
         """
         初期化
-        
+
         Args:
             perf_manager: PerformanceManagerインスタンス
             operation_name: 操作名
