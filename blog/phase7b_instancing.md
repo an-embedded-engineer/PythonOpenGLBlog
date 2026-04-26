@@ -478,7 +478,7 @@ def _draw_instancing_demo(self) -> None:
 
 ### imgui でパラメータを操作
 
-![Phase 7b デモ画面](images/image7_3.png)
+![Phase 7b デモ画面](images/phase7_3.png)
 
 スクリーンショットの計測値（924インスタンス、28×33グリッド）：
 
