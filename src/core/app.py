@@ -16,6 +16,7 @@ from src.graphics import (
     Shader, Camera2D, Camera3D, UpAxis,
     PointGeometry, LineGeometry, TriangleGeometry,
     RectangleGeometry, CubeGeometry, SphereGeometry,
+    InstanceRenderer,
 )
 from src.graphics.transform import Transform
 from src.graphics.batch_renderer import BatchRenderer, PrimitiveType
@@ -103,6 +104,21 @@ class App:
         self._batch_renderer_triangles_geometry: BatchRenderer | None = None  # 三角形ジオメトリ用（インデックスなし）
         self._batch_renderer_triangles: BatchRenderer | None = None  # 矩形・立方体・球体用（インデックスあり）
 
+        # インスタンシングデモ
+        self._instanced_shader: Shader | None = None
+        self._instance_renderer: InstanceRenderer | None = None
+        self._instance_count_x = 20          # X方向のグリッド数
+        self._instance_count_z = 20          # Z方向のグリッド数
+        self._instance_spacing = 2.0         # インスタンス間隔
+        self._instance_scale = 0.6           # インスタンスのスケール
+        self._instance_wave_amplitude = 2.0  # 波の振幅（Y方向）
+        self._instance_wave_speed = 1.0      # 波のアニメーション速度
+        self._instance_wave_time = 0.0       # 波アニメーションの経過時間
+        self._instance_animate = True        # アニメーション有効
+        self._instance_shape = 0             # 0: Cube, 1: Sphere
+        self._setup_instanced_shader()
+        self._setup_instancing()
+
         logger.debug("App.__init__ end")
 
     def _setup_shader(self) -> None:
@@ -110,6 +126,89 @@ class App:
         vertex_path = self.SHADER_DIR / "basic.vert"
         fragment_path = self.SHADER_DIR / "basic.frag"
         self._shader = Shader(vertex_path, fragment_path)
+
+    def _setup_instanced_shader(self) -> None:
+        """インスタンシング用シェーダーをセットアップする"""
+        vertex_path = self.SHADER_DIR / "instanced.vert"
+        fragment_path = self.SHADER_DIR / "basic.frag"  # フラグメントは共通
+        self._instanced_shader = Shader(vertex_path, fragment_path)
+
+    def _setup_instancing(self) -> None:
+        """インスタンシングデモをセットアップする"""
+        if self._instance_renderer:
+            self._instance_renderer.cleanup()
+
+        self._instance_renderer = InstanceRenderer()
+
+        # ベースジオメトリを設定（形状に応じて切り替え）
+        self._update_instancing_geometry()
+
+        # インスタンスデータを生成して設定
+        offsets, colors, scales = self._generate_instance_data()
+        self._instance_renderer.set_instances(offsets, colors, scales)
+
+        n = self._instance_count_x * self._instance_count_z
+        logger.info(f"Instancing setup: {n} instances ({self._instance_count_x}x{self._instance_count_z})")
+
+    def _update_instancing_geometry(self) -> None:
+        """インスタンシングのベースジオメトリを更新する"""
+        if not self._instance_renderer:
+            return
+
+        if self._instance_shape == 0:
+            # Cube
+            geom = CubeGeometry(size=1.0, r=1.0, g=1.0, b=1.0)
+        else:
+            # Sphere
+            geom = SphereGeometry(radius=0.5, segments=12, rings=8, r=1.0, g=1.0, b=1.0)
+
+        vertices, indices = geom.get_vertex_data()
+        self._instance_renderer.set_geometry(vertices, indices)
+        geom.cleanup()
+
+    def _generate_instance_data(
+        self,
+        time: float = 0.0
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        インスタンスデータ（位置・カラー・スケール）を生成する
+
+        Args:
+            time: アニメーション用の経過時間
+
+        Returns:
+            (offsets, colors, scales) のタプル
+        """
+        nx = self._instance_count_x
+        nz = self._instance_count_z
+        n = nx * nz
+        spacing = self._instance_spacing
+
+        # グリッドの中心を原点に揃えるオフセット
+        center_x = (nx - 1) * spacing * 0.5
+        center_z = (nz - 1) * spacing * 0.5
+
+        offsets = np.zeros((n, 3), dtype=np.float32)
+        colors = np.zeros((n, 3), dtype=np.float32)
+        scales = np.full(n, self._instance_scale, dtype=np.float32)
+
+        for iz in range(nz):
+            for ix in range(nx):
+                idx = iz * nx + ix
+                x = ix * spacing - center_x
+                z = iz * spacing - center_z
+
+                # 波形（サイン波）でY方向に高さを付ける
+                dist = np.sqrt(x * x + z * z)
+                y = np.sin(dist * 0.5 - time * self._instance_wave_speed) * self._instance_wave_amplitude
+
+                offsets[idx] = [x, y, z]
+
+                # カラー: 高さに応じたグラデーション（青→緑→赤）
+                t = (y / (self._instance_wave_amplitude + 1e-6) + 1.0) * 0.5  # 0..1
+                colors[idx] = [t, 0.3 + 0.4 * t, 1.0 - t]
+
+        return offsets, colors, scales
 
     def _setup_geometries(self) -> None:
         """ジオメトリをセットアップする"""
@@ -237,11 +336,17 @@ class App:
         # マウスコントローラーを更新（フレーム終了時）
         self._mouse.update()
 
+        # インスタンシングアニメーションの更新
+        if self._geometry_mode == 7 and self._instance_animate:
+            dt = performance_manager.get_previous_frame_info().frame_time_ms / 1000.0
+            self._instance_wave_time += dt
+
         # ===== imguiウィンドウ =====
         self._draw_settings_window()
         self._draw_camera_window()
         self._draw_transform_window()
         self._draw_geometry_window()
+        self._draw_instancing_window()
         self._draw_performance_window()
 
     def _draw_settings_window(self) -> None:
@@ -384,7 +489,7 @@ class App:
         imgui.begin(name="Geometry")
 
         # 表示モードの選択
-        mode_names = ["Points", "Lines", "Triangles", "All", "Rectangle", "Cube", "Sphere"]
+        mode_names = ["Points", "Lines", "Triangles", "All", "Rectangle", "Cube", "Sphere", "Instancing"]
         changed, self._geometry_mode = imgui.combo("Display Mode", self._geometry_mode, mode_names)
 
         # ワイヤフレームモード
@@ -540,6 +645,70 @@ class App:
 
         imgui.end()
 
+    def _draw_instancing_window(self) -> None:
+        """インスタンシング設定ウィンドウを描画"""
+        imgui.begin("Instancing")
+
+        # インスタンス数
+        total = self._instance_count_x * self._instance_count_z
+        imgui.text(f"Total Instances: {total}")
+
+        changed_x, new_x = imgui.slider_int("Grid X", self._instance_count_x, 1, 50)
+        changed_z, new_z = imgui.slider_int("Grid Z", self._instance_count_z, 1, 50)
+        if changed_x or changed_z:
+            self._instance_count_x = new_x
+            self._instance_count_z = new_z
+            self._setup_instancing()
+
+        imgui.separator()
+
+        # スケールと間隔
+        changed_sp, new_sp = imgui.slider_float("Spacing", self._instance_spacing, 0.5, 5.0)
+        if changed_sp:
+            self._instance_spacing = new_sp
+            self._setup_instancing()
+
+        changed_sc, new_sc = imgui.slider_float("Scale", self._instance_scale, 0.1, 1.5)
+        if changed_sc:
+            self._instance_scale = new_sc
+            self._setup_instancing()
+
+        imgui.separator()
+
+        # 波アニメーション
+        imgui.text("Wave Animation")
+        changed_anim, self._instance_animate = imgui.checkbox("Animate", self._instance_animate)
+
+        changed_amp, new_amp = imgui.slider_float("Amplitude", self._instance_wave_amplitude, 0.0, 5.0)
+        if changed_amp:
+            self._instance_wave_amplitude = new_amp
+
+        changed_spd, new_spd = imgui.slider_float("Speed", self._instance_wave_speed, 0.0, 5.0)
+        if changed_spd:
+            self._instance_wave_speed = new_spd
+
+        if imgui.button("Reset Time"):
+            self._instance_wave_time = 0.0
+
+        imgui.separator()
+
+        # 形状選択
+        shape_names = ["Cube", "Sphere"]
+        changed_shape, new_shape = imgui.combo("Shape", self._instance_shape, shape_names)
+        if changed_shape:
+            self._instance_shape = new_shape
+            self._setup_instancing()
+
+        imgui.separator()
+
+        # ドローコール情報
+        if self._geometry_mode == 7:
+            imgui.text_colored((0.2, 1.0, 0.2, 1.0), "Instancing: 1 draw call")
+            imgui.text(f"Instances: {total}")
+            imgui.text(f"Base vertices: {self._instance_renderer.vertex_count if self._instance_renderer else 0}")
+
+        imgui.end()
+
     def _draw_performance_window(self) -> None:
         """パフォーマンスウィンドウを描画"""
         imgui.begin("Performance")
@@ -655,11 +824,56 @@ class App:
         if not self._shader:
             return
 
+        # モード 7: インスタンシングデモ
+        if self._geometry_mode == 7:
+            self._draw_instancing_demo()
+            return
+
         # バッチレンダリングを使用するかどうか
         if self._use_batch_rendering and self._geometry_mode == 3:
             self._draw_with_batching()
         else:
             self._draw_without_batching()
+
+    def _draw_instancing_demo(self) -> None:
+        """インスタンシングを使用して大量オブジェクトを描画する"""
+        if not self._instanced_shader or not self._instance_renderer:
+            return
+
+        # アニメーション中はインスタンスデータを毎フレーム更新
+        if self._instance_animate:
+            offsets, colors, scales = self._generate_instance_data(self._instance_wave_time)
+            with performance_manager.time_operation("Update Instance Data"):
+                self._instance_renderer.update_instances(offsets, colors, scales)
+
+        # ワイヤフレームモードの設定
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
+        else:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
+        self._instanced_shader.use()
+
+        camera = self._camera_3d if self._use_3d_camera else self._camera_2d
+
+        # グローバル Model 行列（回転スライダー対応）
+        self._transform.set_model_identity()
+        self._transform.rotate_model_x(self._rotation_x)
+        self._transform.rotate_model_y(self._rotation_y)
+        self._transform.rotate_model_z(self._rotation_z)
+
+        self._instanced_shader.set_mat4("model", self._transform.model)
+        self._instanced_shader.set_mat4("view", camera.view_matrix)
+        self._instanced_shader.set_mat4("projection", camera.projection_matrix)
+
+        with performance_manager.time_operation("Draw Instanced"):
+            self._instance_renderer.draw()  # 1 draw call
+
+        performance_manager.set_draw_call_count(1)
+
+        # ワイヤフレームモードをリセット
+        if self._wireframe_mode:
+            gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
     def _draw_without_batching(self) -> None:
         """バッチレンダリングなしで描画（従来の方法）"""
@@ -895,6 +1109,10 @@ class App:
 
     def _shutdown(self) -> None:
         """終了処理"""
+        # インスタンスレンダラーの解放
+        if self._instance_renderer:
+            self._instance_renderer.cleanup()
+
         # バッチレンダラーの解放
         if self._batch_renderer_points:
             self._batch_renderer_points.cleanup()
@@ -922,6 +1140,8 @@ class App:
         # シェーダーの解放
         if self._shader:
             self._shader.delete()
+        if self._instanced_shader:
+            self._instanced_shader.delete()
 
         self._gui.shutdown()
         self._window.terminate()
