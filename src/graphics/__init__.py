@@ -4,6 +4,7 @@ graphicsパッケージ - グラフィックス関連クラス
 from src.graphics.shader import Shader
 from src.graphics.transform import Transform
 from src.graphics.camera import Camera, Camera2D, Camera3D, CameraBase, CameraMode, UpAxis
+from src.graphics.instance_renderer import InstanceRenderer
 from src.graphics.geometry import (
     BufferManager,
     OpenGLBufferManager,
@@ -26,6 +27,7 @@ __all__ = [
     'CameraBase',
     'CameraMode',
     'UpAxis',
+    'InstanceRenderer',
     'BufferManager',
     'OpenGLBufferManager',
     'GeometryBase',
